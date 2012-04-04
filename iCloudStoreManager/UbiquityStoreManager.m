@@ -42,6 +42,7 @@ NSString *DataDirectoryName		= @"Data";
 
 @synthesize delegate;
 @synthesize isReady = _isReady;
+@synthesize hardResetEnabled = _hardResetEnabled;
 
 - (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL {
 	self = [super init];
@@ -212,9 +213,6 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (void)moveDataToiCloudAlert {
-	NSLog(@"UUID = %@", self.localUUID);
-	NSLog(@"iCloud UUID = %@", self.iCloudUUID);
-	
 	moveDataAlert = [[UIAlertView alloc] initWithTitle: [self moveDataToiCloudTitle]
 											   message: [self moveDataToiCloudMessage]
 											  delegate: self
@@ -246,24 +244,26 @@ NSString *DataDirectoryName		= @"Data";
 													message: [self switchToLocalDataMessage]
 												   delegate: self
 										  cancelButtonTitle: @"Cancel"
-										  otherButtonTitles: @"Stop", nil];
+										  otherButtonTitles: @"Continue", nil];
 	[switchToLocalAlert show];	
 }
 
 #pragma mark - Test Methods
 
 - (void)hardResetCloudStorage {
-	[self deleteStoreDirectory];
-	[self deleteTransactionLogs];
-	
-	[self migrate:NO andUseCloudStorageWithUUID:nil completionBlock:^(BOOL usingiCloud) {
-		// Setting iCloudUUID to nil will propagate to all other devices,
-		// and automatically forcing them to switch over to their local stores
-		
-		self.iCloudUUID = nil;	
-		self.localUUID = nil;
-		self.iCloudEnabled = NO;
-	}];
+	if (_hardResetEnabled) {
+		[self migrate:NO andUseCloudStorageWithUUID:nil completionBlock:^(BOOL usingiCloud) {
+			[self deleteStoreDirectory];
+			[self deleteTransactionLogs];
+			
+			// Setting iCloudUUID to nil will propagate to all other devices,
+			// and automatically force them to switch over to their local stores
+			
+			self.iCloudUUID = nil;	
+			self.localUUID = nil;
+			self.iCloudEnabled = NO;
+		}];
+	}
 }
 
 - (NSArray *)fileList {
@@ -363,13 +363,8 @@ NSString *DataDirectoryName		= @"Data";
 	BOOL willUseiCloud = (uuid != nil);
 	
 	// TODO: Check for use case where user checks out of one iCloud account, and logs into another!
-	// Maybe code that goes seomewhere else too!
 	
-	// TODO: Test deletion from Mac System Preferences -> Manage Data -> Delete Data (nuke option)
-	
-	// TODO: Test race condition when multiple devices think they are seeding the data
-	
-	// TODO: Fix error! *** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: 'Object's persistent store is not reachable from this NSManagedObjectContext's coordinator'
+	// TODO: Test deletion from Settings App -> Manage Data -> Delete Data (nuke option)
 	
     NSPersistentStoreCoordinator* psc = persistentStoreCoordinator__;
 	
@@ -463,6 +458,28 @@ NSString *DataDirectoryName		= @"Data";
 	}];
 }
 
+- (void)replaceiCloudStoreWithUUID:(NSString *)uuid {
+    if (persistentStoreCoordinator__ == nil)
+		persistentStoreCoordinator__ = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel: model__];
+	
+	[self migrate:NO andUseCloudStorageWithUUID:uuid completionBlock:^(BOOL usingiCloud) {
+		if (usingiCloud) {
+			self.localUUID		= uuid;
+			self.iCloudEnabled	= YES;
+		}
+		else {
+			if (_hardResetEnabled) {
+				// Hard reset has occurred. Delete database and transaction logs
+				[self deleteStoreDirectory];
+				[self deleteTransactionLogs];
+			}
+			
+			self.localUUID		= nil;
+			self.iCloudEnabled	= NO;
+		}
+	}];
+}
+
 #pragma mark - Top Level Methods
 
 - (void)checkiCloudStatus {
@@ -474,19 +491,6 @@ NSString *DataDirectoryName		= @"Data";
 		if ((cloudURL == nil) || [[self fileList] count] < 2)
 			[self useLocalStorage];
 	}
-}
-
-- (void)replaceiCloudStoreWithUUID:(NSString *)uuid {
-	[self migrate:NO andUseCloudStorageWithUUID:uuid completionBlock:^(BOOL usingiCloud) {
-		if (usingiCloud) {
-			self.localUUID		= uuid;
-			self.iCloudEnabled	= YES;
-		}
-		else {
-			self.localUUID		= nil;
-			self.iCloudEnabled	= NO;
-		}
-	}];
 }
 
 - (void)useiCloudStore:(BOOL)willUseiCloud {
@@ -608,7 +612,9 @@ NSString *DataDirectoryName		= @"Data";
 #pragma mark - Notifications
 
 - (void)mergeiCloudChanges:(NSNotification*)note forContext:(NSManagedObjectContext*)moc {
-    [moc mergeChangesFromContextDidSaveNotification:note]; 
+	[moc performBlock:^{
+		[moc mergeChangesFromContextDidSaveNotification:note]; 
+	}];
 	
     NSNotification* refreshNotification = [NSNotification notificationWithName: RefreshAllViewsNotificationKey
 																		object: self

@@ -28,7 +28,7 @@
 - (IBAction)setiCloudState:(id)sender {
 	UISwitch *aSwitch = sender;
 	
-	// STEP 5a - Display current state of the UbiquityStoreManager
+	// STEP 5a - Set the state of the UbiquityStoreManager to reflect the current UI
 	[[[AppDelegate appDelegate] ubiquityStoreManager] useiCloudStore:aSwitch.on];
 }
 

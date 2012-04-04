@@ -48,6 +48,10 @@ NSString * const RefreshAllViewsNotificationKey;
 // is always set immediately before the RefetchAllDatabaseDataNotification is sent.
 @property (nonatomic, readonly) BOOL isReady;
 
+// Setting this property to YES os helpful for test purposes. It is highly recommended
+// to set this to NO for production deployments
+@property (nonatomic) BOOL hardResetEnabled;
+
 // Start by instantiating a UbiquityStoreManager with a managed object model. A valid localStoreURL
 // is also required even if iCloud support is not currently enabled for this device. If it is enabled,
 // it is required in case the user disables iCloud support for this device. If iCloud support is disabled

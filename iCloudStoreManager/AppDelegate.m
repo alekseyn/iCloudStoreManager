@@ -40,6 +40,9 @@
 	
 	// STEP 2a  - Setup the delegate
 	ubiquityStoreManager.delegate = self;
+	
+	// For test purposes only. NOT FOR USE IN PRODUCTION
+	ubiquityStoreManager.hardResetEnabled = YES;
 
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     // Override point for customization after application launch.
@@ -195,12 +198,7 @@
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager mergeChangesFromiCloud:(NSNotification *)notification {
 	NSManagedObjectContext* moc = [self managedObjectContext];
-	
-	// This only works if we used NSMainQueueConcurrencyType
-	// since we need to get back to the main thread
-	[moc performBlock:^{
-        [ubiquityStoreManager mergeiCloudChanges:notification forContext:moc];
-    }];
+	[ubiquityStoreManager mergeiCloudChanges:notification forContext:moc];
 }
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch {

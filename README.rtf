@@ -1,0 +1,92 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf320
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Menlo-Regular;\f2\fmodern\fcharset0 Courier;
+}
+{\colortbl;\red255\green255\blue255;\red170\green13\blue145;\red92\green38\blue153;\red38\green38\blue38;
+}
+\margl1440\margr1440\vieww15720\viewh17680\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\b\fs24 \cf0 \
+
+\b0 iCloudStoreManager Notes - Created  April 4, 2012\
+
+\b \
+Introduction
+\b0 \
+This standalone iOS project demonstrates using iCloud to sync a CoreData store between different iOS devices, what has been called a Library-style app. It must be run on an actual iOS device.\
+\
+
+\b Using The App\
+
+\b0 To run the app you will first need to setup the iCloud entitlements. If you are not familiar with this, there is an excellent discussion here: http://oleb.net/blog/2011/11/ios5-tech-talk-michael-jurewitz-on-icloud-storage/\
+\
+After installing the app on at least two devices. Generate a few lines of data by tapping the + symbol. Then tap the iCloud switch to ON. After 10 to 30 seconds you should see the second device's iCloud switch automatically switch ON, and the data on both devices should now be the same. Add and delete data by swiping on either device to observe how the data stays in sync.\
+\
+You can also try switching iCloud OFF and ON on either device to see how it can easily be switched between local data and iCloud data.\
+\
+
+\b The UX Model\
+
+\b0 The user experience model follows a very simple set of rules. An iCloud switch is required so that users can control from which device they seed iCloud. This is important because once an iCloud store is seeded with data, it should not be seeded again.\
+\
+1. A user can seed iCloud with a baseline set of data from any device.\
+2. Once iCloud is seeded from one device, other devices are automatically enabled to use iCloud using the seeded data. This may take 20 to 30 seconds.\
+3. If a user attempts to seed iCloud from multiple devices at the same time, the last device to seed iCloud with data wins.\
+4. A user can at any time disable iCloud from within the app. That will switch the app from the iCloud store to the local data store. These stores are completely separate and independent.\
+5. A user can at any time enable iCloud from within the app. That will switch the app from using the local data store to the iCloud store. \
+\
+For test purposes ONLY, tapping the Clear iCloud button will delete all iCloud data from all devices (it may take 30 seconds for this action to propagate to other devices). When this happens, each individual device will switch to using it's local data, and iCloud within this app is disabled.\
+\
+
+\b Using UbiquityStoreManager\
+
+\b0 \
+The goal was to implement the simplest possible API. Apple's instructions on how to use Core Data with iCloud are deceivingly simple. Hopefully this class will make it truly simple and straightforward.\
+\
+To implement this same functionality in your own app, all you need is UbiquityStoreManager.h and UbiquityStoreManager.m.  There are roughly 7+ steps required in configuring and using UbiquityStoreManager. Search for STEP to find examples of all of the changes you will likely need to make it work in your own project.\
+\
+This class includes alert messages to assist the user in making the appropriate choices when enabling or disabling iCloud.\
+\
+The three most important methods are listed here:\
+\
+1. Use this method to create and initialize a single instance in your app delegate class:\
+\
+\pard\tx560\pardeftab560\pardirnatural
+
+\f1\fs22 \cf0 \CocoaLigature0 - (\cf2 id\cf0 )initWithManagedObjectModel:(\cf3 NSManagedObjectModel\cf0  *)model localStoreURL:(\cf3 NSURL\cf0  *)storeURL;\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 \CocoaLigature1 2. Instead of creating your own persistent coordinator, you must use the one supplied by UbiquityStoreManager.\
+\pard\tx560\pardeftab560\pardirnatural
+
+\f1\fs22 \cf0 \CocoaLigature0 \
+- (\cf3 NSPersistentStoreCoordinator\cf0  *)persistentStoreCoordinator;\
+\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 \CocoaLigature1 3. And to switch between using the iCloud store and the local data store, call this method.\
+\pard\tx560\pardeftab560\pardirnatural
+
+\f1\fs22 \cf0 \CocoaLigature0 \
+- (\cf2 void\cf0 )useiCloudStore:(\cf2 BOOL\cf0 )willUseiCloud;\
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 \CocoaLigature1 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 However, using just these three methods is not sufficient for Core Data to function properly with iCloud. Please look at the source code to see all of the other methods and properties required.\
+\pard\tx560\pardeftab560\pardirnatural
+
+\f1\fs22 \cf0 \CocoaLigature0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 \CocoaLigature1 \
+\
+\pard\pardeftab720
+
+\f2 \cf4 iCloudStoreManager is released under the New BSD License.\
+\
+Copyright (c) 2012, Yodel Code LLC\
+All rights reserved.
+\f0 \cf0 \
+}
