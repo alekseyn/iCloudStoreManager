@@ -175,7 +175,7 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (NSString *)switchToLocalDataMessage {
-	return @"If you stop using iCloud you will switch to using data from this device only. Your local data is completely separate from iCloud. Any changes you make will not be be synchronized with iCloud.";
+	return @"If you stop using iCloud you will switch to using local data on this device only. Your local data is completely separate from iCloud. Any changes you make will not be be synchronized with iCloud.";
 }
 
 #pragma mark - UIAlertView
