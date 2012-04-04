@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model name="" userDefinedModelVersionIdentifier="" type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="1171" systemVersion="11D50" minimumToolsVersion="Automatic" macOSVersion="Automatic" iOSVersion="Automatic">
+    <entity name="Event" representedClassName="Event">
+        <attribute name="timeStamp" optional="YES" attributeType="Date"/>
+        <relationship name="user" minCount="1" maxCount="1" deletionRule="Nullify" destinationEntity="User" inverseName="events" inverseEntity="User" syncable="YES"/>
+    </entity>
+    <entity name="User" representedClassName="User" syncable="YES">
+        <attribute name="primary" optional="YES" attributeType="Boolean" defaultValueString="NO" syncable="YES"/>
+        <attribute name="timestamp" optional="YES" attributeType="Date" syncable="YES"/>
+        <relationship name="events" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="Event" inverseName="user" inverseEntity="Event" syncable="YES"/>
+    </entity>
+    <fetchRequest name="primaryUser" entity="User" predicateString="primary == 1"/>
+    <elements>
+        <element name="Event" positionX="1366" positionY="-459" width="128" height="75"/>
+        <element name="User" positionX="1179" positionY="-342" width="128" height="90"/>
+    </elements>
+</model>
