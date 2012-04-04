@@ -51,7 +51,7 @@ However, using just these three methods is not sufficient for Core Data to funct
 
 TESTING AND KNOWN PROBLEMS
 
-This has been tested out on an iPhone 4, iPhone 4S, original iPad, and the new iPad. Everything works except with the new iPad! If anyone discovers why this might not work with the new iPad please let me know!
+This has been tested out on an iPhone 4, iPhone 4S, original iPad, and the new iPad. Everything has been tested with up to four devices and works well (for the small data set in this project). However, changes may sometimes take 20 minutes to propagate, leading you to think it's not working. But it does eventually catch up.
 
 
 iCloudStoreManager is released under the New BSD License.
