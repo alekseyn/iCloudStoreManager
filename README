@@ -49,6 +49,9 @@ The three most important methods are listed here:
 
 However, using just these three methods is not sufficient for Core Data to function properly with iCloud. Please look at the source code to see all of the other methods and properties required.
 
+TESTING AND KNOWN PROBLEMS
+
+This has been tested out on an iPhone 4, iPhone 4S, original iPad, and the new iPad. Everything works except with the new iPad! If anyone discovers why this might not work with the new iPad please let me know!
 
 
 iCloudStoreManager is released under the New BSD License.
