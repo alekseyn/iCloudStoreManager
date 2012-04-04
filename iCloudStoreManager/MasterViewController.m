@@ -34,7 +34,6 @@
 
 - (IBAction)cleariCloud:(id)sender {
 	iCloudSwitch.on = NO;
-	clearButton.enabled = NO;
 	
 	// STEP 6 - UbiquityStoreManager hard reset. FOR TESTING ONLY! Do not expose to the end user!
 	[[[AppDelegate appDelegate] ubiquityStoreManager] hardResetCloudStorage];
@@ -72,7 +71,6 @@
 			// STEP 5b - Display current state of the UbiquityStoreManager
 			BOOL enabled = [[AppDelegate appDelegate] ubiquityStoreManager].iCloudEnabled;
 			[iCloudSwitch setOn:enabled animated:YES];
-			clearButton.enabled = enabled;
 		}
 	}
 }
@@ -99,7 +97,6 @@
 
 	// STEP 5c - Display current state of the UbiquityStoreManager
 	self.iCloudSwitch.on = [[AppDelegate appDelegate] ubiquityStoreManager].iCloudEnabled;
-	self.clearButton.enabled = self.iCloudSwitch.on;
 }
 
 - (void)viewDidUnload

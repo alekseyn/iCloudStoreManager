@@ -307,6 +307,8 @@ NSString *DataDirectoryName		= @"Data";
 - (void)migrateToiCloud:(BOOL)migrate persistentStoreCoordinator:(NSPersistentStoreCoordinator *)psc with:(NSString *)uuid {
 	NSDictionary *options;
 
+	NSAssert([[psc persistentStores] count] == 0, @"There were more persistent stores than expected");
+
 	[self createStoreDirectoryIfNecessary];
 	
 	// Clear old registered notifcations. This was required to address an exception that occurs when using
@@ -333,8 +335,11 @@ NSString *DataDirectoryName		= @"Data";
 															  configuration: nil 
 																		URL: localStoreURL__
 																	options: nil
-																	  error: nil];
-		
+																	  error: &error];
+
+		if (error) NSLog(@"Prepping migrated store error: %@", error);
+
+		error = nil;
 		persistentStore__ = [psc migratePersistentStore: migratedStore 
 												  toURL: [self iCloudStoreURLForUUID:uuid]
 												options: options
@@ -356,6 +361,8 @@ NSString *DataDirectoryName		= @"Data";
 											selector: @selector(mergeChanges:) 
 												name: NSPersistentStoreDidImportUbiquitousContentChangesNotification 
 											  object: psc];
+
+	NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
 }
 
 - (void)migrate:(BOOL)migrate andUseCloudStorageWithUUID:(NSString *)uuid completionBlock:(void (^)(BOOL usingiCloud))completionBlock {
