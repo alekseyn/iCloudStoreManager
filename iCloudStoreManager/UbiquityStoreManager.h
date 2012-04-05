@@ -30,7 +30,7 @@ NSString * const RefreshAllViewsNotificationKey;
 @class UbiquityStoreManager;
 
 @protocol UbiquityStoreManagerDelegate <NSObject>
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager mergeChangesFromiCloud:(NSNotification *)notification;
+- (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm;
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch;
 @end
@@ -63,9 +63,6 @@ NSString * const RefreshAllViewsNotificationKey;
 
 // If the user has decided to start using iCloud, call this method. And vice versa.
 - (void)useiCloudStore:(BOOL)willUseiCloud;
-
-// Called to send out a notification to refresh views
-- (void)mergeiCloudChanges:(NSNotification*)note forContext:(NSManagedObjectContext*)moc;
 
 // Reset iCloud data. Intended for test purposes only
 - (void)hardResetCloudStorage;

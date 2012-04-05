@@ -196,14 +196,12 @@
 
 // STEP 4 - Implement the UbiquityStoreManager delegate methods
 
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager mergeChangesFromiCloud:(NSNotification *)notification {
-	NSManagedObjectContext* moc = [self managedObjectContext];
-	[ubiquityStoreManager mergeiCloudChanges:notification forContext:moc];
+- (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm {
+	return self.managedObjectContext;
 }
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch {
 	[masterViewController.iCloudSwitch setOn:didSwitch animated:YES];
 }
-
 
 @end

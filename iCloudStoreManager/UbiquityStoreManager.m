@@ -53,10 +53,9 @@ NSString *DataDirectoryName		= @"Data";
 		// Start iCloud connection
 		[self updateLocalCopyOfiCloudUUID];
 		
-		// Check iCloud status
 		[self checkiCloudStatus];
+		[self registerForNotifications];
 	}
-	[self registerForNotifications];
 	
 	return self;
 }
@@ -311,12 +310,6 @@ NSString *DataDirectoryName		= @"Data";
 
 	[self createStoreDirectoryIfNecessary];
 	
-	// Clear old registered notifcations. This was required to address an exception that occurs when using
-	// a persistent store on iCloud setup by another device (Object's persistent store is not reachable
-	// from this NSManagedObjectContext's coordinator)
-	[[NSNotificationCenter defaultCenter] removeObserver: self 
-													name: NSPersistentStoreDidImportUbiquitousContentChangesNotification
-												  object: psc];
 	NSError *error = nil;
 	NSURL *transactionLogsURL = [self transactionLogsURLForUUID:uuid];
 	
@@ -330,6 +323,13 @@ NSString *DataDirectoryName		= @"Data";
 	[psc lock];
 	
 	if (migrate) {
+		// Clear old registered notifcations. This was required to address an exception that occurs when using
+		// a persistent store on iCloud setup by another device (Object's persistent store is not reachable
+		// from this NSManagedObjectContext's coordinator)
+		[[NSNotificationCenter defaultCenter] removeObserver: self 
+														name: NSPersistentStoreDidImportUbiquitousContentChangesNotification
+													  object: psc];
+
 		// Add the store to migrate
 		NSPersistentStore * migratedStore = [psc addPersistentStoreWithType: NSSQLiteStoreType
 															  configuration: nil 
@@ -345,6 +345,11 @@ NSString *DataDirectoryName		= @"Data";
 												options: options
 											   withType: NSSQLiteStoreType
 												  error: &error];
+
+		[[NSNotificationCenter defaultCenter]addObserver: self 
+												selector: @selector(mergeChanges:) 
+													name: NSPersistentStoreDidImportUbiquitousContentChangesNotification 
+												  object: psc];
 	}
 	else {
 		persistentStore__ = [psc addPersistentStoreWithType: NSSQLiteStoreType
@@ -357,11 +362,6 @@ NSString *DataDirectoryName		= @"Data";
 	
 	if (error) NSLog(@"Persistent store error: %@", error);
 	
-	[[NSNotificationCenter defaultCenter]addObserver: self 
-											selector: @selector(mergeChanges:) 
-												name: NSPersistentStoreDidImportUbiquitousContentChangesNotification 
-											  object: psc];
-
 	NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
 }
 
@@ -538,14 +538,6 @@ NSString *DataDirectoryName		= @"Data";
 	}
 }
 
-- (void)mergeChanges:(NSNotification *)note {
-	NSLog(@"Merge change notification received");
-	
-	if ([delegate respondsToSelector:@selector(ubiquityStoreManager:mergeChangesFromiCloud:)]) {
-		[delegate ubiquityStoreManager:self mergeChangesFromiCloud:note];
-	}
-}
-
 #pragma mark - Properties
 
 - (BOOL)iCloudEnabled {
@@ -605,7 +597,7 @@ NSString *DataDirectoryName		= @"Data";
 - (void)keyValueStoreChanged:(NSNotification *)note {
 	NSLog(@"KeyValueStore changed");
 	
-	NSDictionary* changedKeys = [note.userInfo objectForKey:@"NSUbiquitousKeyValueStoreChangedKeysKey"];
+	NSDictionary* changedKeys = [note.userInfo objectForKey:NSUbiquitousKeyValueStoreChangedKeysKey];
 	for (NSString *key in changedKeys) {
 		if ([key isEqualToString:iCloudUUIDKey]) {
 			
@@ -618,7 +610,10 @@ NSString *DataDirectoryName		= @"Data";
 
 #pragma mark - Notifications
 
-- (void)mergeiCloudChanges:(NSNotification*)note forContext:(NSManagedObjectContext*)moc {
+- (void)mergeChanges:(NSNotification *)note {
+	NSLog(@"NSPersistentStoreDidImportUbiquitousContentChangesNotification received");
+	
+	NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
 	[moc performBlock:^{
 		[moc mergeChangesFromContextDidSaveNotification:note]; 
 	}];
@@ -634,8 +629,14 @@ NSString *DataDirectoryName		= @"Data";
 - (void)registerForNotifications {
 	[[NSNotificationCenter defaultCenter] addObserver: self
 											 selector: @selector(keyValueStoreChanged:)
-												 name: @"NSUbiquitousKeyValueStoreDidChangeExternallyNotification"
+												 name: NSUbiquitousKeyValueStoreDidChangeExternallyNotification
 											   object: nil];
+
+	[[NSNotificationCenter defaultCenter]addObserver: self 
+											selector: @selector(mergeChanges:) 
+												name: NSPersistentStoreDidImportUbiquitousContentChangesNotification 
+											  object: [self persistentStoreCoordinator]];
+	
 }
 
 - (void)removeNotifications {

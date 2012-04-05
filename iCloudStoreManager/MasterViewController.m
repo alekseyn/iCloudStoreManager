@@ -208,6 +208,8 @@
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
+	[self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+	
     NSManagedObject *object = [[self fetchedResultsController] objectAtIndexPath:indexPath];
     if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
 	    if (!self.detailViewController) {
