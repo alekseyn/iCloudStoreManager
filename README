@@ -3,7 +3,9 @@ iCloudStoreManager Notes - Created  April 4, 2012
 
 INTRODUCTION
 
-This standalone iOS project demonstrates using iCloud to sync a CoreData store between different iOS devices, what has been called a Library-style app. It must be run on an actual iOS device.
+This standalone iOS project demonstrates using iCloud to sync a CoreData store between different iOS devices, what is often referred to as a Shoebox-style app. It must be run on an actual iOS device.
+
+WARNING: This code continues to display occasional errors and may not yet be suitable for production release.
 
 USING THE APP
 
@@ -51,7 +53,7 @@ However, using just these three methods is not sufficient for Core Data to funct
 
 TESTING AND KNOWN PROBLEMS
 
-This has been tested out on an iPhone 4, iPhone 4S, original iPad, and the new iPad. Everything has been tested with up to four devices and works well (for the small data set in this project). However, changes may sometimes take 20 minutes to propagate, leading you to think it's not working. But it does eventually catch up.
+This has been tested out on an iPhone 4, iPhone 4S, original iPad, and the new iPad. Everything has been tested with up to four devices and works well in most cases. However, changes may sometimes take 20 minutes to propagate (typically on my new iPad), leading you to think it's not working. But it does eventually catch up. A bug report has been filed and is referenced at http://openradar.appspot.com/radar?id=1643401
 
 
 iCloudStoreManager is released under the New BSD License.
