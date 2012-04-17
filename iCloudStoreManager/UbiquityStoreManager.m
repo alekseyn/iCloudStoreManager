@@ -25,6 +25,7 @@ NSString *DataDirectoryName		= @"Data";
 	UIAlertView *moveDataAlert;
 	UIAlertView *switchToiCloudAlert;
 	UIAlertView *switchToLocalAlert;
+	dispatch_queue_t persistentStorageQueue;
 }
 
 @property (nonatomic) NSString *localUUID;
@@ -49,6 +50,7 @@ NSString *DataDirectoryName		= @"Data";
 	if (self) {
 		model__ = model;
 		localStoreURL__ = storeURL;
+		persistentStorageQueue = dispatch_queue_create([@"PersistentStorageQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
 		
 		// Start iCloud connection
 		[self updateLocalCopyOfiCloudUUID];
@@ -62,6 +64,7 @@ NSString *DataDirectoryName		= @"Data";
 
 - (void)dealloc {
 	[self removeNotifications];
+	dispatch_release(persistentStorageQueue);
 }
 
 #pragma mark - File Handling
@@ -266,7 +269,7 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (NSArray *)fileList {
-	NSArray *fileList;
+	NSArray *fileList = nil;
 
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
 	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
@@ -377,7 +380,7 @@ NSString *DataDirectoryName		= @"Data";
 	
 	// Do this asynchronously since if this is the first time this particular device is syncing with preexisting
 	// iCloud content it may take a long long time to download
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    dispatch_async(persistentStorageQueue, ^{
         NSFileManager *fileManager = [NSFileManager defaultManager];
 		NSDictionary *options;
 		
@@ -485,6 +488,13 @@ NSString *DataDirectoryName		= @"Data";
 			self.iCloudEnabled	= NO;
 		}
 	}];
+}
+
+- (NSURL *)currentStoreURL {
+	if (self.iCloudEnabled)
+		return [self iCloudStoreURLForUUID:self.iCloudUUID];
+	else
+		return localStoreURL__;
 }
 
 #pragma mark - Top Level Methods
@@ -606,6 +616,7 @@ NSString *DataDirectoryName		= @"Data";
 			[self replaceiCloudStoreWithUUID:self.iCloudUUID];
 		}
 	}
+	NSLog(@"KeyValueStore change completed");
 }
 
 #pragma mark - Notifications
@@ -613,16 +624,20 @@ NSString *DataDirectoryName		= @"Data";
 - (void)mergeChanges:(NSNotification *)note {
 	NSLog(@"NSPersistentStoreDidImportUbiquitousContentChangesNotification received");
 	
-	NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
-	[moc performBlock:^{
-		[moc mergeChangesFromContextDidSaveNotification:note]; 
-	}];
-	
-    NSNotification* refreshNotification = [NSNotification notificationWithName: RefreshAllViewsNotificationKey
-																		object: self
-																	  userInfo: [note userInfo]];
-    
-    [[NSNotificationCenter defaultCenter] postNotification:refreshNotification];
+	dispatch_async(persistentStorageQueue, ^{
+		NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
+		[moc performBlockAndWait:^{
+			[moc mergeChangesFromContextDidSaveNotification:note]; 
+		}];
+		
+		dispatch_async(dispatch_get_main_queue(), ^{
+			NSNotification* refreshNotification = [NSNotification notificationWithName: RefreshAllViewsNotificationKey
+																				object: self
+																			  userInfo: [note userInfo]];
+			
+			[[NSNotificationCenter defaultCenter] postNotification:refreshNotification];
+		});
+	});
 }
 
 

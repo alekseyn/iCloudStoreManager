@@ -18,8 +18,8 @@
 // NSUbiquitousKeyValueStore is the mechanism used to discover which iCloud store to use.
 // There may be better ways, but for now, that is what is being used.
 //
-// Use the "Hard Reset" button to reset iCloud data. The hard reset will propagate to all
-// devices if the device's app is running. However, there may be a propagation delay of 20 sec.
+// Use the "Clear iCloud Data" button to reset iCloud data. This hard reset will propagate to all
+// devices if the device's app is running. However, there may be a propagation delay of 20 sec. or more.
 // or more.
 
 #import <Foundation/Foundation.h>
@@ -48,8 +48,8 @@ NSString * const RefreshAllViewsNotificationKey;
 // is always set immediately before the RefetchAllDatabaseDataNotification is sent.
 @property (nonatomic, readonly) BOOL isReady;
 
-// Setting this property to YES os helpful for test purposes. It is highly recommended
-// to set this to NO for production deployments
+// Setting this property to YES is helpful for test purposes. It is highly recommended
+// to set this to NO for production deployment
 @property (nonatomic) BOOL hardResetEnabled;
 
 // Start by instantiating a UbiquityStoreManager with a managed object model. A valid localStoreURL
@@ -74,5 +74,8 @@ NSString * const RefreshAllViewsNotificationKey;
 
 // Array of all files and directorys in the ubiquity store. Useful for testing
 - (NSArray *)fileList;
+
+// File URL for the currently selected store
+- (NSURL *)currentStoreURL;
 
 @end
