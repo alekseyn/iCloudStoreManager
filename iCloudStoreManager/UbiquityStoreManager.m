@@ -80,10 +80,6 @@ NSString *DataDirectoryName		= @"Data";
 
 #pragma mark - File Handling
 
-- (NSString *)iCloudStoreName {
-	return @"iCloudStoreManager.sqlite";
-}
-
 - (NSURL *)iCloudStoreURLForUUID:(NSString *)uuid {
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
 	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
