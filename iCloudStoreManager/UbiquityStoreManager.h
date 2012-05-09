@@ -33,12 +33,22 @@
 NSString * const RefetchAllDatabaseDataNotificationKey;
 NSString * const RefreshAllViewsNotificationKey;
 
+typedef enum {
+    UbiquityStoreManagerErrorCauseDeleteStore,
+    UbiquityStoreManagerErrorCauseCreateStorePath,
+    UbiquityStoreManagerErrorCauseClearStore,
+    UbiquityStoreManagerErrorCauseOpenLocalStore,
+    UbiquityStoreManagerErrorCauseOpenCloudStore,
+} UbiquityStoreManagerErrorCause;
+
 @class UbiquityStoreManager;
 
 @protocol UbiquityStoreManagerDelegate <NSObject>
 - (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm;
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
 @end
 
 #if TARGET_OS_IPHONE
@@ -73,7 +83,7 @@ NSString * const RefreshAllViewsNotificationKey;
 - (NSPersistentStoreCoordinator *)persistentStoreCoordinator;
 
 // If the user has decided to start using iCloud, call this method. And vice versa.
-- (void)useiCloudStore:(BOOL)willUseiCloud;
+- (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser;
 
 // Reset iCloud data. Intended for test purposes only
 - (void)hardResetCloudStorage;
