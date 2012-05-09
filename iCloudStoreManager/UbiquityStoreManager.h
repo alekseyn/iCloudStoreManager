@@ -35,6 +35,7 @@ NSString * const RefreshAllViewsNotificationKey;
 
 typedef enum {
     UbiquityStoreManagerErrorCauseDeleteStore,
+    UbiquityStoreManagerErrorCauseDeleteLogs,
     UbiquityStoreManagerErrorCauseCreateStorePath,
     UbiquityStoreManagerErrorCauseClearStore,
     UbiquityStoreManagerErrorCauseOpenLocalStore,
@@ -87,6 +88,7 @@ typedef enum {
 
 // Reset iCloud data. Intended for test purposes only
 - (void)hardResetCloudStorage;
+- (void)hardResetLocalStorage;
 
 // Checks iCloud to ensure user has not deleted all iCloud data (nuke all use case).
 // If the iCloud data has been deleted from within the Settings app or Mac System Preferences,

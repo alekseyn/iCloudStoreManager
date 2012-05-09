@@ -136,8 +136,16 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (void)deleteTransactionLogs {
-		NSFileManager *fileManager	= [NSFileManager defaultManager];
-		[fileManager removeItemAtPath:[[self transactionLogsURL] path] error:nil];
+    NSError *error = nil;
+    NSString *path = [[self transactionLogsURL] path];
+    NSFileManager *fileManager	= [NSFileManager defaultManager];
+    [fileManager removeItemAtPath:path error:&error];
+    if (error)
+        if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+            [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:path];
+        else
+            NSLog(@"Error deleting local store: %@", error);
+
 }
 
 - (NSURL *)transactionLogsURLForUUID:(NSString *)uuid {
@@ -151,8 +159,14 @@ NSString *DataDirectoryName		= @"Data";
 		
 		// Can only continue if iCloud is available
 		if (cloudURL) {
+            NSError *error = nil;
 			NSString *transactionLogsForUUID = [[self transactionLogsURLForUUID:uuid] path];
-			[fileManager removeItemAtPath:transactionLogsForUUID error:nil];
+			[fileManager removeItemAtPath:transactionLogsForUUID error:&error];
+            if (error)
+                if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                    [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:transactionLogsForUUID];
+                else
+                    NSLog(@"Error deleting local store: %@", error);
 		}
 	}
 }
@@ -304,6 +318,18 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 #pragma mark - Test Methods
+
+- (void)hardResetLocalStorage {
+	if (_hardResetEnabled) {
+        NSError *error;
+		[[NSFileManager defaultManager] removeItemAtURL:localStoreURL__ error:&error];
+        if (error)
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:localStoreURL__];
+            else
+                NSLog(@"Error deleting local store: %@", error);
+	}
+}
 
 - (void)hardResetCloudStorage {
 	if (_hardResetEnabled) {
@@ -474,11 +500,17 @@ NSString *DataDirectoryName		= @"Data";
 			
 			[psc lock];
 			
+            NSError *error = nil;
 			persistentStore__ = [psc addPersistentStoreWithType: NSSQLiteStoreType
 												  configuration: nil
 															URL: localStoreURL__ 
 														options: options 
-														  error: nil];
+														  error: &error];
+            if (error)
+                if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                    [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL__];
+                else
+                    NSLog(@"Persistent store error: %@", error);
 			
 			[psc unlock];
 		}
@@ -488,8 +520,13 @@ NSString *DataDirectoryName		= @"Data";
 		// performFetch again now there is a real store.
 		
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            
+            if (![[psc persistentStores] count])
+                return;
+            
 			_isReady = YES;
 			
+            NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
 			NSString *usingiCloudString = (usingiCloud) ? @" using iCloud!" : @"!";
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
                 [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Asynchronously added persistent store%@", usingiCloudString]];
