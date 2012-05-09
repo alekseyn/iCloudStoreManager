@@ -1,6 +1,6 @@
 //
 //  AppDelegate.m
-//  iCloudStoreManager
+//  iCloudStoreManagerExample
 //
 //  Created by Aleksey Novicov on 3/27/12.
 //  Copyright (c) 2012 Yodel Code LLC. All rights reserved.
@@ -149,7 +149,7 @@
     if (__managedObjectModel != nil) {
         return __managedObjectModel;
     }
-    NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"iCloudStoreManager" withExtension:@"momd"];
+    NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"iCloudStoreManagerExample" withExtension:@"momd"];
     __managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:modelURL];
     return __managedObjectModel;
 }
