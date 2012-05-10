@@ -23,9 +23,24 @@
 // or more.
 
 #import <Foundation/Foundation.h>
+#import <CoreData/CoreData.h>
+#if TARGET_OS_IPHONE
+#import <UIKit/UIKit.h>
+#else
+#import <Cocoa/Cocoa.h>
+#endif
 
 NSString * const RefetchAllDatabaseDataNotificationKey;
 NSString * const RefreshAllViewsNotificationKey;
+
+typedef enum {
+    UbiquityStoreManagerErrorCauseDeleteStore,
+    UbiquityStoreManagerErrorCauseDeleteLogs,
+    UbiquityStoreManagerErrorCauseCreateStorePath,
+    UbiquityStoreManagerErrorCauseClearStore,
+    UbiquityStoreManagerErrorCauseOpenLocalStore,
+    UbiquityStoreManagerErrorCauseOpenCloudStore,
+} UbiquityStoreManagerErrorCause;
 
 @class UbiquityStoreManager;
 
@@ -33,9 +48,15 @@ NSString * const RefreshAllViewsNotificationKey;
 - (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm;
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
 @end
 
+#if TARGET_OS_IPHONE
 @interface UbiquityStoreManager : NSObject <UIAlertViewDelegate>
+#else
+@interface UbiquityStoreManager : NSObject
+#endif
 
 // The delegate confirms when a device has been switched to using either iCloud data or local data
 @property (nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
@@ -56,16 +77,18 @@ NSString * const RefreshAllViewsNotificationKey;
 // is also required even if iCloud support is not currently enabled for this device. If it is enabled,
 // it is required in case the user disables iCloud support for this device. If iCloud support is disabled
 // after being initially enabled, the store on iCloud is NOT migrated back to the local device.
-- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL;
+- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL
+             containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions;
 
 // Always use this method to instantiate or retrieve the main persistentStoreCoordinator.
 - (NSPersistentStoreCoordinator *)persistentStoreCoordinator;
 
 // If the user has decided to start using iCloud, call this method. And vice versa.
-- (void)useiCloudStore:(BOOL)willUseiCloud;
+- (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser;
 
 // Reset iCloud data. Intended for test purposes only
 - (void)hardResetCloudStorage;
+- (void)hardResetLocalStorage;
 
 // Checks iCloud to ensure user has not deleted all iCloud data (nuke all use case).
 // If the iCloud data has been deleted from within the Settings app or Mac System Preferences,

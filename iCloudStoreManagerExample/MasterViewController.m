@@ -1,6 +1,6 @@
 //
 //  MasterViewController.m
-//  iCloudStoreManager
+//  iCloudStoreManagerExample
 //
 //  Created by Aleksey Novicov on 3/27/12.
 //  Copyright (c) 2012 Yodel Code LLC. All rights reserved.
@@ -29,7 +29,7 @@
 	UISwitch *aSwitch = sender;
 	
 	// STEP 5a - Set the state of the UbiquityStoreManager to reflect the current UI
-	[[[AppDelegate appDelegate] ubiquityStoreManager] useiCloudStore:aSwitch.on];
+	[[[AppDelegate appDelegate] ubiquityStoreManager] useiCloudStore:aSwitch.on alertUser:YES];
 }
 
 - (IBAction)cleariCloud:(id)sender {

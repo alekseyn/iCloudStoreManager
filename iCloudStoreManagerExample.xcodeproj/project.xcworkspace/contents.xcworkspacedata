@@ -2,6 +2,6 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "self:iCloudStoreManager.xcodeproj">
+      location = "self:iCloudStoreManagerExample.xcodeproj">
    </FileRef>
 </Workspace>

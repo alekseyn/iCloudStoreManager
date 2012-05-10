@@ -1,6 +1,6 @@
 //
 //  AppDelegate.m
-//  iCloudStoreManager
+//  iCloudStoreManagerExample
 //
 //  Created by Aleksey Novicov on 3/27/12.
 //  Copyright (c) 2012 Yodel Code LLC. All rights reserved.
@@ -9,6 +9,7 @@
 #import "AppDelegate.h"
 #import "MasterViewController.h"
 #import "DetailViewController.h"
+#import "UbiquityStoreManager.h"
 #import "User.h"
 
 @interface AppDelegate ()
@@ -35,9 +36,10 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
 	// STEP 1 - Initialize the UbiquityStoreManager
-	ubiquityStoreManager = [[UbiquityStoreManager alloc] initWithManagedObjectModel: [self managedObjectModel]
-																	  localStoreURL: [self storeURL]];
-	
+	ubiquityStoreManager = [[UbiquityStoreManager alloc] initWithManagedObjectModel: [self managedObjectModel] 
+																	  localStoreURL: [self storeURL] 
+																containerIdentifier: nil 
+															 additionalStoreOptions: nil];
 	// STEP 2a  - Setup the delegate
 	ubiquityStoreManager.delegate = self;
 	
@@ -149,7 +151,7 @@
     if (__managedObjectModel != nil) {
         return __managedObjectModel;
     }
-    NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"iCloudStoreManager" withExtension:@"momd"];
+    NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"iCloudStoreManagerExample" withExtension:@"momd"];
     __managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:modelURL];
     return __managedObjectModel;
 }

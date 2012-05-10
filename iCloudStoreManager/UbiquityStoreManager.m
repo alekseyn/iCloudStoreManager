@@ -8,6 +8,12 @@
 
 #import "UbiquityStoreManager.h"
 
+#if TARGET_OS_IPHONE
+#define OS_Alert UIAlertView
+#else
+#define OS_Alert NSAlert
+#endif
+
 NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
 NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
 
@@ -18,13 +24,15 @@ NSString *DatabaseDirectoryName	= @"Database.nosync";
 NSString *DataDirectoryName		= @"Data";
 
 @interface UbiquityStoreManager () {
+    NSDictionary *additionalStoreOptions__;
+    NSString *containerIdentifier__;
 	NSManagedObjectModel *model__;
 	NSPersistentStoreCoordinator *persistentStoreCoordinator__;
 	NSPersistentStore *persistentStore__;
 	NSURL *localStoreURL__;
-	UIAlertView *moveDataAlert;
-	UIAlertView *switchToiCloudAlert;
-	UIAlertView *switchToLocalAlert;
+	OS_Alert *moveDataAlert;
+	OS_Alert *switchToiCloudAlert;
+	OS_Alert *switchToLocalAlert;
 	dispatch_queue_t persistentStorageQueue;
 }
 
@@ -45,9 +53,12 @@ NSString *DataDirectoryName		= @"Data";
 @synthesize isReady = _isReady;
 @synthesize hardResetEnabled = _hardResetEnabled;
 
-- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL {
+- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL
+             containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions {
 	self = [super init];
 	if (self) {
+        additionalStoreOptions__ = additionalStoreOptions;
+        containerIdentifier__ = containerIdentifier;
 		model__ = model;
 		localStoreURL__ = storeURL;
 		persistentStorageQueue = dispatch_queue_create([@"PersistentStorageQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
@@ -69,13 +80,9 @@ NSString *DataDirectoryName		= @"Data";
 
 #pragma mark - File Handling
 
-- (NSString *)iCloudStoreName {
-	return @"iCloudStoreManager.sqlite";
-}
-
 - (NSURL *)iCloudStoreURLForUUID:(NSString *)uuid {
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
+	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 	NSString *databaseContent	= [[cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
 	NSString *storePath			= [databaseContent stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.sqlite", uuid]];
 	
@@ -88,7 +95,7 @@ NSString *DataDirectoryName		= @"Data";
 
 - (void)deleteStoreDirectory {
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
+	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 	NSString *databaseContent	= [[cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
 	
 	if ([fileManager fileExistsAtPath:databaseContent]) {
@@ -96,34 +103,49 @@ NSString *DataDirectoryName		= @"Data";
 		[fileManager removeItemAtPath:databaseContent error:&error];
 		
 		if (error)
-			NSLog(@"Error deleting old store: %@", error);
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:databaseContent];
+            else
+                NSLog(@"Error deleting old store: %@", error);
 	}
 }
 
 - (void)createStoreDirectoryIfNecessary {
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
+	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 	NSString *databaseContent	= [[cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
 	
 	if (![fileManager fileExistsAtPath:databaseContent]) {
 		NSError *error = nil;
 		[fileManager createDirectoryAtPath:databaseContent withIntermediateDirectories:YES attributes:nil error:&error];
 		
-		if (error) NSLog(@"Error creating database directory: %@", error);
+		if (error)
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseCreateStorePath context:databaseContent];
+            else
+                NSLog(@"Error creating database directory: %@", error);
 	}
 }
 
 - (NSURL *)transactionLogsURL {
 	NSFileManager *fileManager		= [NSFileManager defaultManager];
-	NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:nil];
+	NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 	NSString* coreDataCloudContent	= [[cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
 	
 	return [NSURL fileURLWithPath:coreDataCloudContent];
 }
 
 - (void)deleteTransactionLogs {
-		NSFileManager *fileManager	= [NSFileManager defaultManager];
-		[fileManager removeItemAtPath:[[self transactionLogsURL] path] error:nil];
+    NSError *error = nil;
+    NSString *path = [[self transactionLogsURL] path];
+    NSFileManager *fileManager	= [NSFileManager defaultManager];
+    [fileManager removeItemAtPath:path error:&error];
+    if (error)
+        if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+            [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:path];
+        else
+            NSLog(@"Error deleting local store: %@", error);
+
 }
 
 - (NSURL *)transactionLogsURLForUUID:(NSString *)uuid {
@@ -133,12 +155,18 @@ NSString *DataDirectoryName		= @"Data";
 - (void)deleteTransactionLogsForUUID:(NSString *)uuid {
 	if (uuid) {
 		NSFileManager *fileManager	= [NSFileManager defaultManager];
-		NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
+		NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 		
 		// Can only continue if iCloud is available
 		if (cloudURL) {
+            NSError *error = nil;
 			NSString *transactionLogsForUUID = [[self transactionLogsURLForUUID:uuid] path];
-			[fileManager removeItemAtPath:transactionLogsForUUID error:nil];
+			[fileManager removeItemAtPath:transactionLogsForUUID error:&error];
+            if (error)
+                if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                    [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:transactionLogsForUUID];
+                else
+                    NSLog(@"Error deleting local store: %@", error);
 		}
 	}
 }
@@ -182,7 +210,7 @@ NSString *DataDirectoryName		= @"Data";
 
 #pragma mark - UIAlertView
 
-- (void)alertView:(UIAlertView *)alertView didDismissWithButtonIndex:(NSInteger)buttonIndex {
+- (void)alertView:(OS_Alert *)alertView didDismissWithButtonIndex:(NSInteger)buttonIndex {
 	if (alertView == moveDataAlert) {
 		if (buttonIndex == 1) {
 			// Move the data from the local store to the iCloud store
@@ -215,42 +243,93 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (void)moveDataToiCloudAlert {
+#if TARGET_OS_IPHONE
 	moveDataAlert = [[UIAlertView alloc] initWithTitle: [self moveDataToiCloudTitle]
 											   message: [self moveDataToiCloudMessage]
 											  delegate: self
 									 cancelButtonTitle: @"Cancel"
 									 otherButtonTitles: @"Move Data", nil];
 	[moveDataAlert show];	
+#else
+    moveDataAlert = [NSAlert alertWithMessageText:[self moveDataToiCloudTitle]
+                                    defaultButton:@"Move Data"
+                                  alternateButton:@"Cancel"
+                                      otherButton:nil
+                        informativeTextWithFormat:[self moveDataToiCloudMessage]];
+    NSInteger button = [moveDataAlert runModal];
+    [self alertView:moveDataAlert didDismissWithButtonIndex:button == NSAlertDefaultReturn? 1: 0];
+#endif
 }
 
 - (void)switchToiCloudDataAlert {
+#if TARGET_OS_IPHONE
 	switchToiCloudAlert = [[UIAlertView alloc] initWithTitle: [self switchDataToiCloudTitle]
 													 message: [self switchDataToiCloudMessage]
 													delegate: self
 										   cancelButtonTitle: @"Cancel"
 										   otherButtonTitles: @"Use iCloud", nil];
-	[switchToiCloudAlert show];	
+	[switchToiCloudAlert show];
+#else
+    switchToiCloudAlert = [NSAlert alertWithMessageText:[self switchDataToiCloudTitle]
+                                    defaultButton:@"Use iCloud"
+                                  alternateButton:@"Cancel"
+                                      otherButton:nil
+                        informativeTextWithFormat:[self switchDataToiCloudMessage]];
+    NSInteger button = [switchToiCloudAlert runModal];
+    [self alertView:switchToiCloudAlert didDismissWithButtonIndex:button == NSAlertDefaultReturn? 1: 0];
+#endif
 }
 
 - (void)tryLaterAlert {
+#if TARGET_OS_IPHONE
 	UIAlertView *alert = [[UIAlertView alloc] initWithTitle: [self tryLaterTitle]
 													message: [self tryLaterMessage]
 												   delegate: nil
 										  cancelButtonTitle: @"Done"
 										  otherButtonTitles: nil];
-	[alert show];	
+	[alert show];
+#else
+    NSAlert *alert = [NSAlert alertWithMessageText:[self tryLaterTitle]
+                                          defaultButton:@"Cancel"
+                                        alternateButton:nil
+                                            otherButton:nil
+                              informativeTextWithFormat:[self tryLaterMessage]];
+    [alert runModal];
+#endif
 }
 
 - (void)switchToLocalDataAlert {
+#if TARGET_OS_IPHONE
 	switchToLocalAlert = [[UIAlertView alloc] initWithTitle: [self switchToLocalDataTitle]
 													message: [self switchToLocalDataMessage]
 												   delegate: self
 										  cancelButtonTitle: @"Cancel"
 										  otherButtonTitles: @"Continue", nil];
 	[switchToLocalAlert show];	
+#else
+    switchToLocalAlert = [NSAlert alertWithMessageText:[self switchToLocalDataTitle]
+                                          defaultButton:@"Continue"
+                                        alternateButton:@"Cancel"
+                                            otherButton:nil
+                              informativeTextWithFormat:[self switchToLocalDataMessage]];
+    NSInteger button = [switchToLocalAlert runModal];
+    [self alertView:switchToLocalAlert didDismissWithButtonIndex:button == NSAlertDefaultReturn? 1: 0];
+#endif
 }
 
 #pragma mark - Test Methods
+
+- (void)hardResetLocalStorage {
+	if (_hardResetEnabled) {
+        NSError *error;
+		[[NSFileManager defaultManager] removeItemAtURL:localStoreURL__ error:&error];
+        if (error)
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:localStoreURL__];
+            else
+                NSLog(@"Error deleting local store: %@", error);
+	}
+}
 
 - (void)hardResetCloudStorage {
 	if (_hardResetEnabled) {
@@ -272,7 +351,7 @@ NSString *DataDirectoryName		= @"Data";
 	NSArray *fileList = nil;
 
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
+	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 	
 	if (cloudURL)
 		fileList = [fileManager subpathsAtPath:[cloudURL path]];
@@ -289,9 +368,10 @@ NSString *DataDirectoryName		= @"Data";
 		persistentStore__ = nil;
 		
 		if (error)
-			NSLog(@"Error removing persistent store: %@", error);
-		else 
-			NSLog(@"Existing persistent store removed");
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseClearStore context:persistentStore__];
+            else
+                NSLog(@"Error removing persistent store: %@", error);
 	}
 }
 
@@ -307,7 +387,7 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (void)migrateToiCloud:(BOOL)migrate persistentStoreCoordinator:(NSPersistentStoreCoordinator *)psc with:(NSString *)uuid {
-	NSDictionary *options;
+	NSMutableDictionary *options;
 
 	NSAssert([[psc persistentStores] count] == 0, @"There were more persistent stores than expected");
 
@@ -316,15 +396,17 @@ NSString *DataDirectoryName		= @"Data";
 	NSError *error = nil;
 	NSURL *transactionLogsURL = [self transactionLogsURLForUUID:uuid];
 	
-	options = [NSDictionary dictionaryWithObjectsAndKeys:
+	options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
 			   uuid, NSPersistentStoreUbiquitousContentNameKey,
 			   transactionLogsURL, NSPersistentStoreUbiquitousContentURLKey,
 			   [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
 			   [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
 			   nil];
+    [options addEntriesFromDictionary:additionalStoreOptions__];
 	
 	[psc lock];
 	
+    NSURL *cloudStoreURL = [self iCloudStoreURLForUUID:uuid];
 	if (migrate) {
 		// Clear old registered notifcations. This was required to address an exception that occurs when using
 		// a persistent store on iCloud setup by another device (Object's persistent store is not reachable
@@ -337,14 +419,18 @@ NSString *DataDirectoryName		= @"Data";
 		NSPersistentStore * migratedStore = [psc addPersistentStoreWithType: NSSQLiteStoreType
 															  configuration: nil 
 																		URL: localStoreURL__
-																	options: nil
+																	options: additionalStoreOptions__
 																	  error: &error];
 
-		if (error) NSLog(@"Prepping migrated store error: %@", error);
+		if (error)
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL__];
+            else
+                NSLog(@"Prepping migrated store error: %@", error);
 
 		error = nil;
 		persistentStore__ = [psc migratePersistentStore: migratedStore 
-												  toURL: [self iCloudStoreURLForUUID:uuid]
+												  toURL: cloudStoreURL
 												options: options
 											   withType: NSSQLiteStoreType
 												  error: &error];
@@ -357,19 +443,27 @@ NSString *DataDirectoryName		= @"Data";
 	else {
 		persistentStore__ = [psc addPersistentStoreWithType: NSSQLiteStoreType
 											  configuration: nil
-														URL: [self iCloudStoreURLForUUID:uuid]
+														URL: cloudStoreURL
 													options: options
 													  error: &error];
 	}
 	[psc unlock];
 	
-	if (error) NSLog(@"Persistent store error: %@", error);
-	
-	NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
+	if (error)
+        if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+            [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL];
+        else {
+            NSLog(@"Persistent store error: %@", error);
+            NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
+        }
 }
 
 - (void)migrate:(BOOL)migrate andUseCloudStorageWithUUID:(NSString *)uuid completionBlock:(void (^)(BOOL usingiCloud))completionBlock {
-	NSLog(@"Setting up store with %@", uuid);
+
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+        [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Setting up store with UUID: %@", uuid]];
+    else
+        NSLog(@"Setting up store with UUID: %@", uuid);
 	BOOL willUseiCloud = (uuid != nil);
 	
 	// TODO: Check for use case where user checks out of one iCloud account, and logs into another!
@@ -382,12 +476,12 @@ NSString *DataDirectoryName		= @"Data";
 	// iCloud content it may take a long long time to download
     dispatch_async(persistentStorageQueue, ^{
         NSFileManager *fileManager = [NSFileManager defaultManager];
-		NSDictionary *options;
+		NSMutableDictionary *options;
 		
 		// Clear previous persistentStore
 		[self clearPersistentStore];
 		
-        NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:nil];
+        NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
         NSString* coreDataCloudContent	= [[cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
 		
 		BOOL usingiCloud = ([coreDataCloudContent length] != 0) && willUseiCloud;
@@ -398,18 +492,25 @@ NSString *DataDirectoryName		= @"Data";
 		}
 		else {
 			// iCloud is not available
-			options = [NSDictionary dictionaryWithObjectsAndKeys:
+			options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
 					   [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
 					   [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
 					   nil];
+            [options addEntriesFromDictionary:additionalStoreOptions__];
 			
 			[psc lock];
 			
+            NSError *error = nil;
 			persistentStore__ = [psc addPersistentStoreWithType: NSSQLiteStoreType
 												  configuration: nil
 															URL: localStoreURL__ 
 														options: options 
-														  error: nil];
+														  error: &error];
+            if (error)
+                if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+                    [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL__];
+                else
+                    NSLog(@"Persistent store error: %@", error);
 			
 			[psc unlock];
 		}
@@ -418,17 +519,33 @@ NSString *DataDirectoryName		= @"Data";
 		// to make your views do whatever they need to such as tell their NSFetchedResultsController to
 		// performFetch again now there is a real store.
 		
-        dispatch_async(dispatch_get_main_queue(), ^{
+		// Marteen, without this compiler switch, I get the exception "Object's persistent store is not reachable from this NSManagedObjectContext's coordinator"
+		// when running on iOS. To replicate the exception, run an iOS but use dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0) instead.
+		// I tried have a separate dispatch block for the main_queue within the global_queue, but that did not resolve the issue.
+#if TARGET_OS_IPHONE		
+		dispatch_async(dispatch_get_main_queue(), ^{
+#else
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+#endif
+			if (![[psc persistentStores] count])
+				return;
+			
 			_isReady = YES;
+
+			NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
 			
 			NSString *usingiCloudString = (usingiCloud) ? @" using iCloud!" : @"!";
-            NSLog(@"Asynchronously added persistent store%@", usingiCloudString);
 			
+			if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+				[self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Asynchronously added persistent store%@", usingiCloudString]];
+			else
+				NSLog(@"Asynchronously added persistent store%@", usingiCloudString);
+		
 			if(completionBlock) {
 				completionBlock(usingiCloud);
 			}
 
-            [[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
+			[[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
 			[self didSwitchToiCloud:willUseiCloud];
         });
     });
@@ -457,7 +574,11 @@ NSString *DataDirectoryName		= @"Data";
 }
 
 - (void)setupCloudStorageWithUUID:(NSString *)uuid {
-	NSLog(@"Setting up iCloud data with new UUID = %@", uuid);
+
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+        [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Setting up iCloud data with new UUID: %@", uuid]];
+    else
+        NSLog(@"Setting up iCloud data with new UUID: %@", uuid);
 
 	[self migrate:YES andUseCloudStorageWithUUID:uuid completionBlock:^(BOOL usingiCloud) {
 		if (usingiCloud) {
@@ -502,7 +623,7 @@ NSString *DataDirectoryName		= @"Data";
 - (void)checkiCloudStatus {
 	if (self.iCloudEnabled) {
 		NSFileManager *fileManager	= [NSFileManager defaultManager];
-		NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:nil];
+		NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 
 		// If we have only one file/directory (Documents directory), then iCloud data has been deleted by user
 		if ((cloudURL == nil) || [[self fileList] count] < 2)
@@ -510,7 +631,7 @@ NSString *DataDirectoryName		= @"Data";
 	}
 }
 
-- (void)useiCloudStore:(BOOL)willUseiCloud {
+- (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser {
 	// To provide the option of using iCloud immediately upon first running of an app,
 	// make sure a persistentStoreCoordinator exists.
 	
@@ -524,20 +645,29 @@ NSString *DataDirectoryName		= @"Data";
 			// If an iCloud store already exists, ask the user if they want to switch over to iCloud
 			if (cloud) {
 				if (self.iCloudUUID) {
-					[self switchToiCloudDataAlert];
+                    if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
+                        [self switchToiCloudDataAlert];
+                    else
+                        [self useCloudStorage];
 				}
 				else {
-					[self moveDataToiCloudAlert];
+                    if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
+                        [self moveDataToiCloudAlert];
+                    else
+                        [self setupCloudStorageWithUUID:[self freshUUID]];
 				}
 			}
-			else {
+			else if (alertUser) {
 				[self tryLaterAlert];
 			}
 		}
 	}
 	else {
 		if (self.iCloudEnabled) {
-			[self switchToLocalDataAlert];
+            if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
+                [self switchToLocalDataAlert];
+            else
+                [self useLocalStorage];
 		}
 	}
 }
@@ -605,7 +735,11 @@ NSString *DataDirectoryName		= @"Data";
 #pragma mark - KeyValueStore Notification
 
 - (void)keyValueStoreChanged:(NSNotification *)note {
-	NSLog(@"KeyValueStore changed");
+
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+        [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"KeyValueStore changed: %@", [note.userInfo objectForKey:NSUbiquitousKeyValueStoreChangedKeysKey]]];
+    else
+        NSLog(@"KeyValueStore changed: %@", [note.userInfo objectForKey:NSUbiquitousKeyValueStoreChangedKeysKey]);
 	
 	NSDictionary* changedKeys = [note.userInfo objectForKey:NSUbiquitousKeyValueStoreChangedKeysKey];
 	for (NSString *key in changedKeys) {
@@ -616,13 +750,16 @@ NSString *DataDirectoryName		= @"Data";
 			[self replaceiCloudStoreWithUUID:self.iCloudUUID];
 		}
 	}
-	NSLog(@"KeyValueStore change completed");
 }
 
 #pragma mark - Notifications
 
 - (void)mergeChanges:(NSNotification *)note {
-	NSLog(@"NSPersistentStoreDidImportUbiquitousContentChangesNotification received");
+
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+        [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Ubiquitous store changes: %@", note.userInfo]];
+    else
+        NSLog(@"Ubiquitous store changes: %@", note.userInfo);
 	
 	dispatch_async(persistentStorageQueue, ^{
 		NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
