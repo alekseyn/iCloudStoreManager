@@ -515,36 +515,25 @@ NSString *DataDirectoryName		= @"Data";
 			[psc unlock];
 		}
 
-		// Inform UI on the main thread we finally added the store and then post a custom notification
-		// to make your views do whatever they need to such as tell their NSFetchedResultsController to
-		// performFetch again now there is a real store.
-		
-		// Marteen, without this compiler switch, I get the exception "Object's persistent store is not reachable from this NSManagedObjectContext's coordinator"
-		// when running on iOS. To replicate the exception, run an iOS but use dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0) instead.
-		// I tried have a separate dispatch block for the main_queue within the global_queue, but that did not resolve the issue.
-#if TARGET_OS_IPHONE		
-		dispatch_async(dispatch_get_main_queue(), ^{
-#else
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-#endif
-			if (![[psc persistentStores] count])
-				return;
-			
-			_isReady = YES;
-
-			NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
-			
-			NSString *usingiCloudString = (usingiCloud) ? @" using iCloud!" : @"!";
-			
-			if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
-				[self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Asynchronously added persistent store%@", usingiCloudString]];
-			else
-				NSLog(@"Asynchronously added persistent store%@", usingiCloudString);
+        if (![[psc persistentStores] count])
+            return;
+        
+        _isReady = YES;
+        
+        NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
+        
+        NSString *usingiCloudString = (usingiCloud) ? @" using iCloud!" : @"!";
+        
+        if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+            [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Asynchronously added persistent store%@", usingiCloudString]];
+        else
+            NSLog(@"Asynchronously added persistent store%@", usingiCloudString);
 		
 			if(completionBlock) {
 				completionBlock(usingiCloud);
 			}
 
+        dispatch_async(dispatch_get_main_queue(), ^{
 			[[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
 			[self didSwitchToiCloud:willUseiCloud];
         });
