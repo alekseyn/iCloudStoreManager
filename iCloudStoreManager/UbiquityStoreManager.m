@@ -529,9 +529,9 @@ NSString *DataDirectoryName		= @"Data";
         else
             NSLog(@"Asynchronously added persistent store%@", usingiCloudString);
 		
-			if(completionBlock) {
-				completionBlock(usingiCloud);
-			}
+		if (completionBlock) {
+			completionBlock(usingiCloud);
+		}
 
         dispatch_async(dispatch_get_main_queue(), ^{
 			[[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
