@@ -14,8 +14,8 @@
 #define OS_Alert NSAlert
 #endif
 
-NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
-NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
+static NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
+static NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
 
 NSString *LocalUUIDKey			= @"LocalUUIDKey";
 NSString *iCloudUUIDKey			= @"iCloudUUIDKey";
@@ -685,7 +685,7 @@ NSString *DataDirectoryName		= @"Data";
 	
     CFRelease(uuidRef);
 	
-    return (__bridge NSString *)uuidStringRef;
+    return (__bridge_transfer NSString *)uuidStringRef;
 }
 
 - (void)setLocalUUID:(NSString *)uuid {
