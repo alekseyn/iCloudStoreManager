@@ -685,7 +685,7 @@ NSString *DataDirectoryName		= @"Data";
 	
     CFRelease(uuidRef);
 	
-    return (__bridge NSString *)uuidStringRef;
+    return (__bridge_transfer NSString *)uuidStringRef;
 }
 
 - (void)setLocalUUID:(NSString *)uuid {
