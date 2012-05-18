@@ -58,9 +58,6 @@
 	
 	if ([[AppDelegate appDelegate] ubiquityStoreManager].isReady) {
 		
-		// Make sure a primary user has been created
-		[[AppDelegate appDelegate] primaryUser];
-		
 		// Refetch the data
 		self.fetchedResultsController = nil;		
 		[self fetchedResultsController];
@@ -91,7 +88,7 @@
     [[NSNotificationCenter defaultCenter] addObserver: self
 											 selector: @selector(reloadFetchedResults:)
 												 name: RefetchAllDatabaseDataNotificationKey
-											   object: nil];
+											   object: [[AppDelegate appDelegate] ubiquityStoreManager]];
 	
 	self.tableView.tableHeaderView = self.tableHeaderView;
 
@@ -117,12 +114,11 @@
 - (void)insertNewObject:(id)sender
 {
 	NSManagedObjectContext *context = [self.fetchedResultsController managedObjectContext];
+	User *user = [[[AppDelegate appDelegate] primaryUser] userInContext:context];
 
 	[context performBlockAndWait:^{
 		NSEntityDescription *entity = [[self.fetchedResultsController fetchRequest] entity];
 		NSManagedObject *newManagedObject = [NSEntityDescription insertNewObjectForEntityForName:[entity name] inManagedObjectContext:context];
-		
-		User *user = [[[AppDelegate appDelegate] primaryUser] userInContext:context];
 		
 		// If appropriate, configure the new managed object.
 		// Normally you should use accessor methods, but using KVC here avoids the need to add a custom class to the template.
