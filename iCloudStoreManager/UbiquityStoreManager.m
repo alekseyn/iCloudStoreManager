@@ -14,8 +14,8 @@
 #define OS_Alert NSAlert
 #endif
 
-static NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
-static NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
+NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
+NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
 
 NSString *LocalUUIDKey			= @"LocalUUIDKey";
 NSString *iCloudUUIDKey			= @"iCloudUUIDKey";

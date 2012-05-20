@@ -30,8 +30,8 @@
 #import <Cocoa/Cocoa.h>
 #endif
 
-static NSString * const RefetchAllDatabaseDataNotificationKey;
-static NSString * const RefreshAllViewsNotificationKey;
+extern NSString * const RefetchAllDatabaseDataNotificationKey;
+extern NSString * const RefreshAllViewsNotificationKey;
 
 typedef enum {
     UbiquityStoreManagerErrorCauseDeleteStore,
