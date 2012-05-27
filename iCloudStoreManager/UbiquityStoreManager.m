@@ -481,10 +481,12 @@ NSString *DataDirectoryName		= @"Data";
 		// Clear previous persistentStore
 		[self clearPersistentStore];
 		
-        NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
-        NSString* coreDataCloudContent	= [[cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
-		
-		BOOL usingiCloud = ([coreDataCloudContent length] != 0) && willUseiCloud;
+        NSString* coreDataCloudContent  = nil;
+        if (willUseiCloud) {
+            NSURL *cloudURL             = [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
+            coreDataCloudContent        = [[cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
+        }
+		BOOL usingiCloud = ([coreDataCloudContent length] != 0);
 		
 		if (usingiCloud) {
 			// iCloud is available
