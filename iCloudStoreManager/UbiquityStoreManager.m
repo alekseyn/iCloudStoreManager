@@ -14,8 +14,8 @@
 #define OS_Alert NSAlert
 #endif
 
-static NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
-static NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
+NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
+NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
 
 NSString *LocalUUIDKey			= @"LocalUUIDKey";
 NSString *iCloudUUIDKey			= @"iCloudUUIDKey";
@@ -531,9 +531,9 @@ NSString *DataDirectoryName		= @"Data";
         else
             NSLog(@"Asynchronously added persistent store%@", usingiCloudString);
 		
-			if(completionBlock) {
-				completionBlock(usingiCloud);
-			}
+		if (completionBlock) {
+			completionBlock(usingiCloud);
+		}
 
         dispatch_async(dispatch_get_main_queue(), ^{
 			[[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
