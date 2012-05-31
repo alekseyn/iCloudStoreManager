@@ -1,11 +1,9 @@
 
-iCloudStoreManager Notes - Created  April 4, 2012
+iCloudStoreManager Notes - April 4, 2012
 
 INTRODUCTION
 
 This standalone iOS project demonstrates using iCloud to sync a CoreData store between different iOS devices, what is often referred to as a Shoebox-style app. It must be run on an actual iOS device.
-
-WARNING: This code continues to display occasional errors and may not yet be suitable for production release.
 
 USING THE APP
 
