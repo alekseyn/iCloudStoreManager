@@ -114,6 +114,7 @@ static NSOperationQueue *_presentedItemOperationQueue;
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:databaseContent];
 	}
+	[self resetCloudUUID];
 }
 
 - (void)createStoreDirectoryIfNecessary {
@@ -159,12 +160,10 @@ static NSOperationQueue *_presentedItemOperationQueue;
 							if (blockError)
 								if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
 									[self.delegate ubiquityStoreManager:self didEncounterError:blockError cause:UbiquityStoreManagerErrorCauseDeleteLogs context:itemURL];
-								else
-									NSLog(@"Error deleting transaction logs: %@", blockError);
-							
 						}];
 	if (error)
-		NSLog(@"Error coordinating deletion of transaction logs: %@", error);
+		if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
+			[self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:url];
 }
 
 #pragma mark - Message Strings
@@ -725,6 +724,12 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	return [local objectForKey:iCloudUUIDKey];
 }
 
+- (void)resetCloudUUID {
+	NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
+	[local setObject:nil forKey:iCloudUUIDKey];
+	[local synchronize];
+}
+
 - (void)updateLocalCopyOfiCloudUUID {
 	NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
 	NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
@@ -803,6 +808,9 @@ static NSOperationQueue *_presentedItemOperationQueue;
 }
 
 - (void)accommodatePresentedItemDeletionWithCompletionHandler:(void (^)(NSError *))completionHandler {
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
+        [self.delegate ubiquityStoreManager:self log:@"Coordinated deletion of transaction logs"];
+
 	// Transaction logs have been deleted by a hard reset either here, on another iDevice, or a Mac
     [self useLocalStorage];
 	

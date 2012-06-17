@@ -207,11 +207,11 @@
 }
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error cause:(UbiquityStoreManagerErrorCause)cause context:(id)context {
-	NSLog(@"ERROR: %@", [error description]);
+	NSLog(@"UbiquityStoreManager ERROR: %@", [error description]);
 }
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message {
-	NSLog(@"MESSAGE: %@", message);
+	NSLog(@"UbiquityStoreManager: %@", message);
 }
 
 @end
