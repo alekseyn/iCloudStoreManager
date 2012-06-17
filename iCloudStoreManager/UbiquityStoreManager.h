@@ -53,7 +53,7 @@ typedef enum {
 @end
 
 #if TARGET_OS_IPHONE
-@interface UbiquityStoreManager : NSObject <UIAlertViewDelegate>
+@interface UbiquityStoreManager : NSObject <UIAlertViewDelegate, NSFilePresenter>
 #else
 @interface UbiquityStoreManager : NSObject
 #endif
@@ -86,8 +86,10 @@ typedef enum {
 // If the user has decided to start using iCloud, call this method. And vice versa.
 - (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser;
 
-// Reset iCloud data. Intended for test purposes only
-- (void)hardResetCloudStorage;
+// Reset iCloud data store with warning
+- (void)resetiCloudAlert;
+
+// Immediately delete local store
 - (void)hardResetLocalStorage;
 
 // Checks iCloud to ensure user has not deleted all iCloud data (nuke all use case).

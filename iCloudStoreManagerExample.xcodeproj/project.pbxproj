@@ -446,6 +446,7 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "iCloudStoreManagerExample/iCloudStoreManagerExample-Prefix.pch";
 				INFOPLIST_FILE = "iCloudStoreManagerExample/iCloudStoreManagerExample-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				WRAPPER_EXTENSION = app;
 			};
@@ -455,10 +456,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = iCloudStoreManagerExample/iCloudStoreManagerExample.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer: Aleksey Novicov (948LHQK32F)";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "iCloudStoreManagerExample/iCloudStoreManagerExample-Prefix.pch";
 				INFOPLIST_FILE = "iCloudStoreManagerExample/iCloudStoreManagerExample-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "466222DD-0EDA-40B2-BABA-138AB8522A86";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

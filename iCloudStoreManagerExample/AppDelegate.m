@@ -206,4 +206,12 @@
 	[masterViewController.iCloudSwitch setOn:didSwitch animated:YES];
 }
 
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error cause:(UbiquityStoreManagerErrorCause)cause context:(id)context {
+	NSLog(@"ERROR: %@", [error description]);
+}
+
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message {
+	NSLog(@"MESSAGE: %@", message);
+}
+
 @end

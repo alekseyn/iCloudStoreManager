@@ -33,10 +33,8 @@
 }
 
 - (IBAction)cleariCloud:(id)sender {
-	iCloudSwitch.on = NO;
-	
 	// STEP 6 - UbiquityStoreManager hard reset. FOR TESTING ONLY! Do not expose to the end user!
-	[[[AppDelegate appDelegate] ubiquityStoreManager] hardResetCloudStorage];
+	[[[AppDelegate appDelegate] ubiquityStoreManager] resetiCloudAlert];
 }
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
