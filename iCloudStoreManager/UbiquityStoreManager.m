@@ -102,11 +102,12 @@ NSString *DataDirectoryName		= @"Data";
 		NSError *error = nil;
 		[fileManager removeItemAtPath:databaseContent error:&error];
 		
-		if (error)
+		if (error) {
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:databaseContent];
             else
                 NSLog(@"Error deleting old store: %@", error);
+        }
 	}
 }
 
@@ -119,11 +120,12 @@ NSString *DataDirectoryName		= @"Data";
 		NSError *error = nil;
 		[fileManager createDirectoryAtPath:databaseContent withIntermediateDirectories:YES attributes:nil error:&error];
 		
-		if (error)
+		if (error) {
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseCreateStorePath context:databaseContent];
             else
                 NSLog(@"Error creating database directory: %@", error);
+        }
 	}
 }
 
@@ -140,11 +142,12 @@ NSString *DataDirectoryName		= @"Data";
     NSString *path = [[self transactionLogsURL] path];
     NSFileManager *fileManager	= [NSFileManager defaultManager];
     [fileManager removeItemAtPath:path error:&error];
-    if (error)
+    if (error) {
         if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
             [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:path];
         else
             NSLog(@"Error deleting local store: %@", error);
+    }
 
 }
 
@@ -162,11 +165,12 @@ NSString *DataDirectoryName		= @"Data";
             NSError *error = nil;
 			NSString *transactionLogsForUUID = [[self transactionLogsURLForUUID:uuid] path];
 			[fileManager removeItemAtPath:transactionLogsForUUID error:&error];
-            if (error)
+            if (error) {
                 if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                     [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteLogs context:transactionLogsForUUID];
                 else
                     NSLog(@"Error deleting local store: %@", error);
+            }
 		}
 	}
 }
@@ -323,11 +327,12 @@ NSString *DataDirectoryName		= @"Data";
 	if (_hardResetEnabled) {
         NSError *error;
 		[[NSFileManager defaultManager] removeItemAtURL:localStoreURL__ error:&error];
-        if (error)
+        if (error) {
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:localStoreURL__];
             else
                 NSLog(@"Error deleting local store: %@", error);
+        }
 	}
 }
 
@@ -367,11 +372,12 @@ NSString *DataDirectoryName		= @"Data";
 		[persistentStoreCoordinator__ removePersistentStore:persistentStore__ error:&error];
 		persistentStore__ = nil;
 		
-		if (error)
+		if (error) {
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseClearStore context:persistentStore__];
             else
                 NSLog(@"Error removing persistent store: %@", error);
+        }
 	}
 }
 
@@ -422,11 +428,12 @@ NSString *DataDirectoryName		= @"Data";
 																	options: additionalStoreOptions__
 																	  error: &error];
 
-		if (error)
+		if (error) {
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL__];
             else
                 NSLog(@"Prepping migrated store error: %@", error);
+        }
 
 		error = nil;
 		persistentStore__ = [psc migratePersistentStore: migratedStore 
@@ -449,13 +456,14 @@ NSString *DataDirectoryName		= @"Data";
 	}
 	[psc unlock];
 	
-	if (error)
+	if (error) {
         if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
             [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL];
         else {
             NSLog(@"Persistent store error: %@", error);
             NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
         }
+    }
 }
 
 - (void)migrate:(BOOL)migrate andUseCloudStorageWithUUID:(NSString *)uuid completionBlock:(void (^)(BOOL usingiCloud))completionBlock {
@@ -508,11 +516,12 @@ NSString *DataDirectoryName		= @"Data";
 															URL: localStoreURL__ 
 														options: options 
 														  error: &error];
-            if (error)
+            if (error) {
                 if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                     [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL__];
                 else
                     NSLog(@"Persistent store error: %@", error);
+            }
 			
 			[psc unlock];
 		}
