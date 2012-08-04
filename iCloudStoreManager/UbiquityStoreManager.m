@@ -14,8 +14,8 @@
 #define OS_Alert NSAlert
 #endif
 
-NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
-NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
+NSString * const PersistentStoreDidChange = @"PersistentStoreDidChange";
+NSString * const PersistentStoreDidMergeChanges = @"PersistentStoreDidMergeChanges";
 
 NSString *LocalUUIDKey			= @"LocalUUIDKey";
 NSString *iCloudUUIDKey			= @"iCloudUUIDKey";
@@ -584,7 +584,7 @@ NSString *DataDirectoryName		= @"Data";
 		}
 
         dispatch_async(dispatch_get_main_queue(), ^{
-			[[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
+            [[NSNotificationCenter defaultCenter] postNotificationName:PersistentStoreDidChange object:self userInfo:nil];
 			[self didSwitchToiCloud:willUseiCloud];
         });
     });
@@ -807,7 +807,7 @@ NSString *DataDirectoryName		= @"Data";
 		}];
 
 		dispatch_async(dispatch_get_main_queue(), ^{
-			NSNotification* refreshNotification = [NSNotification notificationWithName: RefreshAllViewsNotificationKey
+			NSNotification* refreshNotification = [NSNotification notificationWithName:PersistentStoreDidMergeChanges
 																				object: self
 																			  userInfo: [note userInfo]];
 
