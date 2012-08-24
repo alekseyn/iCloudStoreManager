@@ -424,10 +424,13 @@ NSString *DataDirectoryName		= @"Data";
 
     if (persistentStoreCoordinator__ == nil) {
 		persistentStoreCoordinator__ = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel: model__];
+    }
 
+    if (![persistentStoreCoordinator__.persistentStores count]) {
 		NSString *uuid = (self.iCloudEnabled) ? self.localUUID : nil;
 		[self migrate:NO andUseCloudStorageWithUUID:uuid completionBlock:nil];
     }
+
     return persistentStoreCoordinator__;
 }
 
@@ -521,6 +524,7 @@ NSString *DataDirectoryName		= @"Data";
 
 	// Do this asynchronously since if this is the first time this particular device is syncing with preexisting
 	// iCloud content it may take a long long time to download
+    _isReady = NO;
     dispatch_async(persistentStorageQueue, ^{
         NSFileManager *fileManager = [NSFileManager defaultManager];
 		NSMutableDictionary *options;
