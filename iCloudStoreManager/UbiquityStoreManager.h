@@ -7,98 +7,117 @@
 //
 // UbiquityStoreManager manages the transfer of your SQL CoreData store from your local
 // application sandbox to iCloud. Even though it is not reinforced, UbiquityStoreManager
-// is expected to be used as a singleton. This sample code is curently for iOS only.
-//
-// This class implements a very simple model. Once iCloud is seeded by data from a
-// particular device, the iCloud store can never be re-seeded with fresh data.
-// However, different devices can repeatedly switch between using their local store
-// and the iCloud store. This is not necessarily a recommended practice but is implemented
-// this way for testing and learning purposes.
+// is expected to be used as a singleton.
 //
 // NSUbiquitousKeyValueStore is the mechanism used to discover which iCloud store to use.
-// There may be better ways, but for now, that is what is being used.
 //
-// Use the "Clear iCloud Data" button to reset iCloud data. This hard reset will propagate to all
-// devices if the device's app is running. However, there may be a propagation delay of 20 sec. or more.
-// or more.
 
 #import <Foundation/Foundation.h>
 #import <CoreData/CoreData.h>
-#if TARGET_OS_IPHONE
-#import <UIKit/UIKit.h>
-#else
-#import <Cocoa/Cocoa.h>
-#endif
 
-extern NSString * const PersistentStoreDidChange;
-extern NSString * const PersistentStoreDidMergeChanges;
+/**
+ * The store managed by the ubiquity manager's coordinator changed (eg. switched from iCloud to local).
+ */
+extern NSString *const UbiquityManagedStoreDidChangeNotification;
+/**
+ * The store managed by the ubiquity manager's coordinator imported changes from iCloud (eg. another device saved changes to iCloud).
+ */
+extern NSString *const UbiquityManagedStoreDidImportChangesNotification;
 
 typedef enum {
-    UbiquityStoreManagerErrorCauseDeleteStore,
-    UbiquityStoreManagerErrorCauseDeleteLogs,
-    UbiquityStoreManagerErrorCauseCreateStorePath,
-    UbiquityStoreManagerErrorCauseClearStore,
-    UbiquityStoreManagerErrorCauseOpenLocalStore,
-    UbiquityStoreManagerErrorCauseOpenCloudStore,
-} UbiquityStoreManagerErrorCause;
+    UbiquityStoreManagerErrorCauseDeleteStore, // Error occurred while deleting the store file or its transaction logs.
+    UbiquityStoreManagerErrorCauseCreateStorePath, // Error occurred while creating the path where the store needs to be saved.
+    UbiquityStoreManagerErrorCauseClearStore, // Error occurred while removing the active store from the coordinator.
+    UbiquityStoreManagerErrorCauseOpenLocalStore, // Error occurred while opening the local store file.
+    UbiquityStoreManagerErrorCauseOpenCloudStore, // Error occurred while opening the cloud store file.
+    UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore, // Error occurred while migrating the local store to the cloud.
+}               UbiquityStoreManagerErrorCause;
 
 @class UbiquityStoreManager;
 
-@protocol UbiquityStoreManagerDelegate <NSObject>
+@protocol UbiquityStoreManagerDelegate<NSObject>
+
+@required
 - (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm;
+
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error
+                       cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
+
 @end
 
-#if TARGET_OS_IPHONE
-@interface UbiquityStoreManager : NSObject <UIAlertViewDelegate>
-#else
 @interface UbiquityStoreManager : NSObject
-#endif
 
-// The delegate confirms when a device has been switched to using either iCloud data or local data
+// The delegate provides the managed object context to use and is informed of events in the ubiquity manager.
 @property (nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
 
-// This property indicates whether the iCloud store or the local store is in use. To
-// change state of this property, use useiCloudStore: method
-@property (nonatomic, readonly) BOOL iCloudEnabled;
+// Indicates whether the iCloud store or the local store is in use.
+@property (nonatomic) BOOL cloudEnabled;
 
-// This property indicates when the persistentStoreCoordinator is ready. This property
-// is always set immediately before the RefetchAllDatabaseDataNotification is sent.
-@property (nonatomic, readonly) BOOL isReady;
+// The coordinator provides access to this manager's active store.
+@property (nonatomic, readonly) NSPersistentStoreCoordinator *persistentStoreCoordinator;
 
-// Setting this property to YES is helpful for test purposes. It is highly recommended
-// to set this to NO for production deployment
-@property (nonatomic) BOOL hardResetEnabled;
+/**
+ *  Start managing an optionally ubiquitous store coordinator.  Default settings will be used.
+ */
+- (id)init;
 
-// Start by instantiating a UbiquityStoreManager with a managed object model. A valid localStoreURL
-// is also required even if iCloud support is not currently enabled for this device. If it is enabled,
-// it is required in case the user disables iCloud support for this device. If iCloud support is disabled
-// after being initially enabled, the store on iCloud is NOT migrated back to the local device.
-- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL
-             containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions;
+/** Start managing an optionally ubiquitous store coordinator.
+ *  @param contentName The name of the local and cloud stores that this manager will create.  If nil, "UbiquityStore" will be used.
+ *  @param model The managed object model the store should use.  If nil, all the main bundle's models will be merged.
+ *  @param localStoreURL The location where the non-ubiquitous (local) store should be kept. If nil, the local store will be put in the application support directory.
+ *  @param containerIdentifier The identifier of the ubiquity container to use for the ubiquitous store. If nil, the entitlement's primary container identifier will be used.
+ *  @param additionalStoreOptions Additional persistence options that the stores should be initialized with.
+ */
+- (id)initStoreNamed:(NSString *)contentName withManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)localStoreURL
+ containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions;
 
-// Always use this method to instantiate or retrieve the main persistentStoreCoordinator.
-- (NSPersistentStoreCoordinator *)persistentStoreCoordinator;
+/**
+ * This will delete the local iCloud data for this application.  There is no recovery.  A new iCloud store will be initialized if enabled.
+ */
+- (void)nukeCloudContainer;
 
-// If the user has decided to start using iCloud, call this method. And vice versa.
-- (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser;
+/**
+ * This will delete the local store.  There is no recovery.
+ */
+- (void)deleteLocalStore;
 
-// Reset iCloud data. Intended for test purposes only
-- (void)hardResetCloudStorage;
-- (void)hardResetLocalStorage;
+/**
+ * This will delete the iCloud store.  Theoretically, it should be rebuilt from the iCloud transaction logs.
+ * TODO: Verify claim.
+ */
+- (void)deleteCloudStore;
 
-// Checks iCloud to ensure user has not deleted all iCloud data (nuke all use case).
-// If the iCloud data has been deleted from within the Settings app or Mac System Preferences,
-// iCloud will be disabled and the active store will be switched over to local store
-- (void)checkiCloudStatus;
+/**
+* @return URL to the active app's ubiquity container.
+*/
+- (NSURL *)URLForCloudContainer;
 
-// Array of all files and directorys in the ubiquity store. Useful for testing
-- (NSArray *)fileList;
+/**
+* @return URL to the directory where we put cloud store databases for this app.
+*/
+- (NSURL *)URLForCloudStoreDirectory;
 
-// File URL for the currently selected store
-- (NSURL *)currentStoreURL;
+/**
+* @return URL to the active cloud store's database.
+*/
+- (NSURL *)URLForCloudStore;
+
+/**
+* @return URL to the directory where we put cloud store transaction logs for this app.
+*/
+- (NSURL *)URLForCloudContentDirectory;
+
+/**
+* @return URL to the active cloud store's transaction logs.
+*/
+- (NSURL *)URLForCloudContent;
+
+/**
+* @return URL to the local store's database.
+*/
+- (NSURL *)URLForLocalStore;
 
 @end
