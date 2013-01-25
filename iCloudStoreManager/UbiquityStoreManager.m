@@ -31,10 +31,11 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 @property (nonatomic, copy) NSURL                  *localStoreURL;
 @property (nonatomic, copy) NSString               *containerIdentifier;
 @property (nonatomic, copy) NSDictionary           *additionalStoreOptions;
-
-@property (nonatomic) NSString         *storeUUID;
-@property (nonatomic) NSOperationQueue *persistentStorageQueue;
+@property (nonatomic, readonly) NSString           *storeUUID;
+@property (nonatomic, strong) NSString             *tentativeStoreUUID;
+@property (nonatomic, strong) NSOperationQueue     *persistentStorageQueue;
 @property (nonatomic) BOOL loadingStore;
+@property (nonatomic) BOOL migrateLocalToCloud;
 
 @end
 
@@ -53,12 +54,13 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     if (!(self = [super init]))
         return nil;
 
-    if (!localStoreURL)
-        localStoreURL = [[[self URLForApplicationContainer] URLByAppendingPathComponent:contentName] URLByAppendingPathExtension:@".sqlite"];
-
     // Parameters
     _contentName            = contentName == nil? @"UbiquityStore": contentName;
     _model                  = model == nil? [NSManagedObjectModel mergedModelFromBundles:nil]: model;
+    if (!localStoreURL)
+        localStoreURL = [[[self URLForApplicationContainer]
+                                URLByAppendingPathComponent:self.contentName isDirectory:NO]
+                                URLByAppendingPathExtension:@".sqlite"];
     _localStoreURL          = localStoreURL;
     _containerIdentifier    = containerIdentifier;
     _additionalStoreOptions = additionalStoreOptions == nil? [NSDictionary dictionary]: additionalStoreOptions;
@@ -87,7 +89,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     return applicationSupportURL;
 #else
     // The directory is shared between all apps on the system so we need to scope it for the running app.
-    applicationSupportURL = [applicationSupportURL URLByAppendingPathComponent:[NSRunningApplication currentApplication].bundleIdentifier];
+    applicationSupportURL = [applicationSupportURL URLByAppendingPathComponent:[NSRunningApplication currentApplication].bundleIdentifier isDirectory:YES];
 
     NSError *error = nil;
     if (![[NSFileManager defaultManager] createDirectoryAtURL:applicationSupportURL
@@ -108,25 +110,29 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     // We put the database in the ubiquity container with a .nosync extension (must not be synced by iCloud),
     // so that its presence is tied closely to whether iCloud is enabled or not on the device
     // and the user can delete the store by deleting his iCloud data for the app from Settings.
-    return [[self URLForCloudContainer] URLByAppendingPathComponent:CloudStoreDirectory];
+    return [[self URLForCloudContainer] URLByAppendingPathComponent:CloudStoreDirectory isDirectory:YES];
 }
 
 - (NSURL *)URLForCloudStore {
 
     // Our cloud store is in the cloud store databases directory and is identified by the active storeUUID.
-    return [[[self URLForCloudStoreDirectory] URLByAppendingPathComponent:self.storeUUID] URLByAppendingPathExtension:@"sqlite"];
+    NSString *uuid = self.storeUUID;
+    NSAssert(uuid, @"No storeUUID set.");
+    return [[[self URLForCloudStoreDirectory] URLByAppendingPathComponent:uuid isDirectory:NO] URLByAppendingPathExtension:@"sqlite"];
 }
 
 - (NSURL *)URLForCloudContentDirectory {
 
     // The transaction logs are in the ubiquity container and are synced by iCloud.
-    return [[self URLForCloudContainer] URLByAppendingPathComponent:CloudLogsDirectory];
+    return [[self URLForCloudContainer] URLByAppendingPathComponent:CloudLogsDirectory isDirectory:YES];
 }
 
 - (NSURL *)URLForCloudContent {
 
     // Our cloud store's logs are in the cloud store transaction logs directory and is identified by the active storeUUID.
-    return [[self URLForCloudContentDirectory] URLByAppendingPathComponent:self.storeUUID];
+    NSString *uuid = self.storeUUID;
+    NSAssert(uuid, @"No storeUUID set.");
+    return [[self URLForCloudContentDirectory] URLByAppendingPathComponent:uuid isDirectory:YES];
 }
 
 - (NSURL *)URLForLocalStore {
@@ -239,13 +245,16 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 return;
             }
 
-            // Migrate the local store to a new cloud store when there is no cloud store yet.
-            BOOL migrateLocalToCloud = NO;
-            if (!self.storeUUID) {
-                self.storeUUID = [[NSUUID UUID] UUIDString];
-
-                if ([[NSFileManager defaultManager] fileExistsAtPath:[self URLForLocalStore].path])
-                    migrateLocalToCloud = YES;
+            // If a migration is requested but no local store is present, don't migrate.
+            if (self.migrateLocalToCloud) {
+                if (![[NSFileManager defaultManager] fileExistsAtPath:[self URLForLocalStore].path]) {
+                    [self log:@"Cannot migrate local store to cloud: local store does not exist."];
+                    self.migrateLocalToCloud = NO;
+                }
+                else if ([[NSFileManager defaultManager] fileExistsAtPath:[self URLForCloudStore].path]) {
+                    [self log:@"Cannot migrate local store to cloud: cloud store already exists."];
+                    self.migrateLocalToCloud = NO;
+                }
             }
 
             // Create the path to the cloud store.
@@ -271,7 +280,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             [self.persistentStoreCoordinator lock];
             [self clearStore];
 
-            if (migrateLocalToCloud) {
+            if (self.migrateLocalToCloud) {
                 // First add the local store, then migrate it to the cloud store.
                 [self log:@"Migrating local store to new cloud store."];
 
@@ -291,12 +300,14 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                             error:&error])
                     [self error:error cause:UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
             }
-             // Not migrating, just add the existing cloud store.
+             // Not migrating, just add the cloud store.
             else if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
                                                                     configuration:nil URL:cloudStoreURL
                                                                           options:cloudStoreOptions
                                                                             error:&error])
                 [self error:error cause:UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
+
+            [self confirmTentativeStoreUUID];
             [self observeStore];
         }
         @finally {
@@ -341,13 +352,12 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
 - (void)nukeCloudContainer {
 
-    self.storeUUID = nil;
-
     NSURL *cloudContainerURL = [self URLForCloudContainer];
     if (cloudContainerURL && [[NSFileManager defaultManager] fileExistsAtPath:cloudContainerURL.path]) {
         [self.persistentStoreCoordinator lock];
         [self clearStore];
 
+        // Delete the contents of the cloud container.
         NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
         for (NSString     *subPath in [[NSFileManager defaultManager] subpathsAtPath:cloudContainerURL.path]) {
             NSError *error = nil;
@@ -362,6 +372,11 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             if (error)
                 [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:subPath];
         }
+
+        // Unset the storeUUID so a new one will be created.
+        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+        [cloud removeObjectForKey:StoreUUIDKey];
+        [cloud synchronize];
 
         [self.persistentStoreCoordinator unlock];
         [self loadStore];
@@ -445,14 +460,30 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 - (NSString *)storeUUID {
 
     NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-    return [cloud objectForKey:StoreUUIDKey];
+    NSString *storeUUID = [cloud objectForKey:StoreUUIDKey];
+    
+    // If no storeUUID is set yet, create a new storeUUID and return that as long as no storeUUID is set yet.
+    // When the migration to the new storeUUID is successful, we update the iCloud's KVS with a call to -setStoreUUID.
+    if (!storeUUID) {
+        if (!self.tentativeStoreUUID)
+            self.tentativeStoreUUID = [[NSUUID UUID] UUIDString];
+        storeUUID = self.tentativeStoreUUID;
+    }
+
+    return storeUUID;
 }
 
-- (void)setStoreUUID:(NSString *)storeUUID {
+/**
+ * When a tentativeStoreUUID is set, this operation confirms it and writes it as the new storeUUID to the iCloud KVS.
+ */
+- (void)confirmTentativeStoreUUID {
 
-    NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-    [cloud setObject:storeUUID forKey:StoreUUIDKey];
-    [cloud synchronize];
+    if (self.tentativeStoreUUID) {
+        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+        [cloud setObject:self.tentativeStoreUUID forKey:StoreUUIDKey];
+        [cloud synchronize];
+        self.tentativeStoreUUID = nil;
+    }
 }
 
 #pragma mark - NSFilePresenter
