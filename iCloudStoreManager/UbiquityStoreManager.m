@@ -67,7 +67,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
     // Private vars
     _persistentStorageQueue = [NSOperationQueue new];
-    [_persistentStorageQueue setName:[self className]];
+    [_persistentStorageQueue setName:NSStringFromClass([self class])];
 
     return self;
 }
@@ -227,8 +227,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
         [self log:@"iCloud disabled.  Loaded local store."];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
-            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToiCloud:)])
-                [self.delegate ubiquityStoreManager:self didSwitchToiCloud:NO];
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
+                [self.delegate ubiquityStoreManager:self didSwitchToCloud:NO];
         });
 
         return;
@@ -318,8 +318,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
         [self log:@"iCloud enabled. Loaded cloud store."];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
-            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToiCloud:)])
-                [self.delegate ubiquityStoreManager:self didSwitchToiCloud:YES];
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
+                [self.delegate ubiquityStoreManager:self didSwitchToCloud:YES];
         });
     }];
 }

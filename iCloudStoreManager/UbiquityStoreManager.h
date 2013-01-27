@@ -41,7 +41,7 @@ typedef enum {
 - (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm;
 
 @optional
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToCloud:(BOOL)cloudEnabled;
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error
                        cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
