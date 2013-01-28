@@ -35,7 +35,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 @property (nonatomic, strong) NSString             *tentativeStoreUUID;
 @property (nonatomic, strong) NSOperationQueue     *persistentStorageQueue;
 @property (nonatomic) BOOL loadingStore;
-@property (nonatomic) BOOL migrateLocalToCloud;
 
 @end
 
@@ -60,7 +59,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     if (!localStoreURL)
         localStoreURL = [[[self URLForApplicationContainer]
                                 URLByAppendingPathComponent:self.contentName isDirectory:NO]
-                                URLByAppendingPathExtension:@".sqlite"];
+                                URLByAppendingPathExtension:@"sqlite"];
     _localStoreURL          = localStoreURL;
     _containerIdentifier    = containerIdentifier;
     _additionalStoreOptions = additionalStoreOptions == nil? [NSDictionary dictionary]: additionalStoreOptions;
@@ -133,6 +132,11 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     NSString *uuid = self.storeUUID;
     NSAssert(uuid, @"No storeUUID set.");
     return [[self URLForCloudContentDirectory] URLByAppendingPathComponent:uuid isDirectory:YES];
+}
+
+- (NSURL *)URLForLocalStoreDirectory {
+    
+    return [self.localStoreURL URLByDeletingLastPathComponent];
 }
 
 - (NSURL *)URLForLocalStore {
@@ -209,6 +213,11 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                            nil];
             [localStoreOptions addEntriesFromDictionary:self.additionalStoreOptions];
 
+            // Make sure local store directory exists.
+            if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForLocalStoreDirectory].path
+                                           withIntermediateDirectories:YES attributes:nil error:&error])
+                [self error:error cause:UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudStoreDirectory].path];
+
             // Add local store to PSC.
             [self.persistentStoreCoordinator lock];
             [self clearStore];
@@ -245,18 +254,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 return;
             }
 
-            // If a migration is requested but no local store is present, don't migrate.
-            if (self.migrateLocalToCloud) {
-                if (![[NSFileManager defaultManager] fileExistsAtPath:[self URLForLocalStore].path]) {
-                    [self log:@"Cannot migrate local store to cloud: local store does not exist."];
-                    self.migrateLocalToCloud = NO;
-                }
-                else if ([[NSFileManager defaultManager] fileExistsAtPath:[self URLForCloudStore].path]) {
-                    [self log:@"Cannot migrate local store to cloud: cloud store already exists."];
-                    self.migrateLocalToCloud = NO;
-                }
-            }
-
             // Create the path to the cloud store.
             NSError *error = nil;
             if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForCloudStoreDirectory].path
@@ -280,7 +277,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             [self.persistentStoreCoordinator lock];
             [self clearStore];
 
-            if (self.migrateLocalToCloud) {
+            // Determine whether we can seed the cloud store from the local store.
+            if ([self cloudSafeForSeeding] && [[NSFileManager defaultManager] fileExistsAtPath:[self URLForLocalStore].path]) {
                 // First add the local store, then migrate it to the cloud store.
                 [self log:@"Migrating local store to new cloud store."];
 
@@ -300,7 +298,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                             error:&error])
                     [self error:error cause:UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
             }
-             // Not migrating, just add the cloud store.
+             // Not seeding, just add the cloud store.
             else if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
                                                                     configuration:nil URL:cloudStoreURL
                                                                           options:cloudStoreOptions
@@ -322,6 +320,19 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 [self.delegate ubiquityStoreManager:self didSwitchToCloud:YES];
         });
     }];
+}
+
+- (BOOL)cloudSafeForSeeding {
+
+    if (!self.tentativeStoreUUID)
+        // Migration is only safe when the storeUUID is tentative.
+        return NO;
+
+    if ([[NSFileManager defaultManager] fileExistsAtPath:[self URLForCloudStore].path])
+        // Migration is only safe when the cloud store does not yet exist.
+        return NO;
+
+    return YES;
 }
 
 - (void)observeStore {

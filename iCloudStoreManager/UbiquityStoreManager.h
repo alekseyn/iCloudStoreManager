@@ -91,6 +91,11 @@ typedef enum {
 - (void)deleteCloudStore;
 
 /**
+* Determine whether it's safe to seed the cloud store with a local store.
+*/
+- (BOOL)cloudSafeForSeeding;
+
+/**
 * @return URL to the active app's ubiquity container.
 */
 - (NSURL *)URLForCloudContainer;
@@ -114,6 +119,11 @@ typedef enum {
 * @return URL to the active cloud store's transaction logs.
 */
 - (NSURL *)URLForCloudContent;
+
+/**
+ * @return URL to the directory where we put the local store database for this app.
+ */
+- (NSURL *)URLForLocalStoreDirectory;
 
 /**
 * @return URL to the local store's database.
