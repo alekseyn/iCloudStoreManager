@@ -39,7 +39,9 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 @end
 
 
-@implementation UbiquityStoreManager
+@implementation UbiquityStoreManager {
+    NSOperationQueue *_presentedItemOperationQueue;
+}
 @synthesize persistentStoreCoordinator = _persistentStoreCoordinator;
 
 - (id)init {
@@ -66,7 +68,9 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
     // Private vars
     _persistentStorageQueue = [NSOperationQueue new];
-    [_persistentStorageQueue setName:NSStringFromClass([self class])];
+    _persistentStorageQueue.name = [NSString stringWithFormat:@"%@PersistenceQueue", NSStringFromClass([self class])];
+    _presentedItemOperationQueue = [NSOperationQueue new];
+    _presentedItemOperationQueue.name = [NSString stringWithFormat:@"%@PresenterQueue", NSStringFromClass([self class])];
 
     return self;
 }
@@ -233,7 +237,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             self.loadingStore = NO;
         }
 
-        [self log:@"iCloud disabled.  Loaded local store."];
+        [self log:@"iCloud disabled. %@",  [self.persistentStoreCoordinator.persistentStores count]? @"Loaded local store.": @"Failed to load local store."];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
@@ -305,15 +309,17 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                             error:&error])
                 [self error:error cause:UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
 
-            [self confirmTentativeStoreUUID];
-            [self observeStore];
+            if ([self.persistentStoreCoordinator.persistentStores count]) {
+                [self confirmTentativeStoreUUID];
+                [self observeStore];
+            }
         }
         @finally {
             [self.persistentStoreCoordinator unlock];
             self.loadingStore = NO;
         }
 
-        [self log:@"iCloud enabled. Loaded cloud store."];
+        [self log:@"iCloud enabled. %@",  [self.persistentStoreCoordinator.persistentStores count]? @"Loaded cloud store.": @"Failed to load cloud store."];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
@@ -507,9 +513,9 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     return [self URLForLocalStore];
 }
 
-- (NSOperationQueue *)presentedItemOperationQueue {
-
-    return self.persistentStorageQueue;
+-(NSOperationQueue *)presentedItemOperationQueue {
+    
+    return _presentedItemOperationQueue;
 }
 
 - (void)accommodatePresentedItemDeletionWithCompletionHandler:(void (^)(NSError *))completionHandler {
