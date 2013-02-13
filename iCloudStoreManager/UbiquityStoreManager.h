@@ -48,7 +48,7 @@ typedef enum {
 
 @end
 
-@interface UbiquityStoreManager : NSObject
+@interface UbiquityStoreManager : NSObject <UIAlertViewDelegate>
 
 // The delegate provides the managed object context to use and is informed of events in the ubiquity manager.
 @property (nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
@@ -58,6 +58,9 @@ typedef enum {
 
 // The coordinator provides access to this manager's active store.
 @property (nonatomic, readonly) NSPersistentStoreCoordinator *persistentStoreCoordinator;
+
+// Check to see if the cloud store has ever been seeded
+@property (nonatomic, readonly) BOOL hasBeenSeeded;
 
 /**
  *  Start managing an optionally ubiquitous store coordinator.  Default settings will be used.

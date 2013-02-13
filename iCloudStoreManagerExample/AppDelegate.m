@@ -43,9 +43,6 @@
 	// STEP 2a  - Setup the delegate
 	ubiquityStoreManager.delegate = self;
 	
-	// For test purposes only. NOT FOR USE IN PRODUCTION
-	ubiquityStoreManager.hardResetEnabled = YES;
-
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     // Override point for customization after application launch.
 	if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
@@ -86,8 +83,7 @@
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
-	// STEP 2b - Check to make sure user has not deleted the iCloud data from Settings
-	[self.ubiquityStoreManager checkiCloudStatus];
+	// Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
@@ -202,7 +198,8 @@
 	return self.managedObjectContext;
 }
 
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch {
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToCloud:(BOOL)didSwitch {
+	NSLog(@"UbiquityStoreManager did switch to %@", (didSwitch) ? @"cloud" : @"local");
 	[masterViewController.iCloudSwitch setOn:didSwitch animated:YES];
 }
 

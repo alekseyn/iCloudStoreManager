@@ -10,6 +10,7 @@
 #import "DetailViewController.h"
 #import "AppDelegate.h"
 #import "UbiquityStoreManager.h"
+#import "UbiquityStoreManager+Alerts.h"
 #import "User.h"
 
 @interface MasterViewController ()
@@ -29,12 +30,12 @@
 	UISwitch *aSwitch = sender;
 	
 	// STEP 5a - Set the state of the UbiquityStoreManager to reflect the current UI
-	[[[AppDelegate appDelegate] ubiquityStoreManager] useiCloudStore:aSwitch.on alertUser:YES];
+	[[[AppDelegate appDelegate] ubiquityStoreManager] alertUserWhileEnablingCloudStore:aSwitch.on];
 }
 
 - (IBAction)cleariCloud:(id)sender {
 	// STEP 6 - UbiquityStoreManager hard reset. FOR TESTING ONLY! Do not expose to the end user!
-	[[[AppDelegate appDelegate] ubiquityStoreManager] resetiCloudAlert];
+	[[[AppDelegate appDelegate] ubiquityStoreManager] resetCloudAlert];
 }
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
@@ -51,22 +52,17 @@
 }
 							
 - (void)reloadFetchedResults:(NSNotification*)note {
+
+	// Refetch the data
+	self.fetchedResultsController = nil;		
+	[self fetchedResultsController];
 	
-	// STEP 7a - Do not allow use of any NSManagedObjectContext until UbiquityStoreManager is ready
-	
-	if ([[AppDelegate appDelegate] ubiquityStoreManager].isReady) {
+	if (note) {
+		[self.tableView reloadData];
 		
-		// Refetch the data
-		self.fetchedResultsController = nil;		
-		[self fetchedResultsController];
-		
-		if (note) {
-			[self.tableView reloadData];
-			
-			// STEP 5b - Display current state of the UbiquityStoreManager
-			BOOL enabled = [[AppDelegate appDelegate] ubiquityStoreManager].iCloudEnabled;
-			[iCloudSwitch setOn:enabled animated:YES];
-		}
+		// STEP 5b - Display current state of the UbiquityStoreManager
+		BOOL enabled = [[AppDelegate appDelegate] ubiquityStoreManager].cloudEnabled;
+		[iCloudSwitch setOn:enabled animated:YES];
 	}
 }
 
@@ -81,17 +77,11 @@
 
 	// iCloud support
 	[self reloadFetchedResults:nil];
-	
-	// Observe the app delegate telling us when it's finished asynchronously setting up the persistent store
-    [[NSNotificationCenter defaultCenter] addObserver: self
-											 selector: @selector(reloadFetchedResults:)
-												 name: RefetchAllDatabaseDataNotificationKey
-											   object: [[AppDelegate appDelegate] ubiquityStoreManager]];
-	
+		
 	self.tableView.tableHeaderView = self.tableHeaderView;
 
 	// STEP 5c - Display current state of the UbiquityStoreManager
-	self.iCloudSwitch.on = [[AppDelegate appDelegate] ubiquityStoreManager].iCloudEnabled;
+	self.iCloudSwitch.on = [[AppDelegate appDelegate] ubiquityStoreManager].cloudEnabled;
 }
 
 - (void)viewDidUnload
@@ -137,13 +127,7 @@
 #pragma mark - Table View
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-
-	// STEP 7b - Do not allow use of any NSManagedObjectContext until UbiquityStoreManager is ready
-
-	if ([[AppDelegate appDelegate] ubiquityStoreManager].isReady)
-		return [[self.fetchedResultsController sections] count];
-	else 
-		return 0;
+	return [[self.fetchedResultsController sections] count];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
@@ -221,12 +205,6 @@
 #pragma mark - Fetched results controller
 
 - (NSFetchedResultsController *)fetchedResultsController {
-
-	// STEP 7c - Do not allow use of any NSManagedObjectContext until UbiquityStoreManager is ready
-
-	if (![[AppDelegate appDelegate] ubiquityStoreManager].isReady)
-		return nil;
-
     if (__fetchedResultsController != nil) {
         return __fetchedResultsController;
     }

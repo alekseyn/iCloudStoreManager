@@ -86,10 +86,7 @@
 #pragma mark - Table View
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-	if ([[AppDelegate appDelegate] ubiquityStoreManager].isReady)
-		return 1;
-	else 
-		return 0;
+	return 1;
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {

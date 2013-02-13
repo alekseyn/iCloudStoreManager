@@ -29,6 +29,7 @@
 		5B4B126F15227DFE00153613 /* User.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B126E15227DFE00153613 /* User.m */; };
 		5B4B127215227DFE00153613 /* Event.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B127115227DFE00153613 /* Event.m */; };
 		5BBC288616CAF055004465F1 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 5BBC288516CAF055004465F1 /* Default-568h@2x.png */; };
+		5BBC288916CAF453004465F1 /* UbiquityStoreManager+Alerts.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BBC288816CAF453004465F1 /* UbiquityStoreManager+Alerts.m */; };
 		DA79AA3D1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = DA79AA3B1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld */; };
 		DA79AA411558613F00BAA07A /* UbiquityStoreManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DA79AA401558613F00BAA07A /* UbiquityStoreManager.m */; };
 /* End PBXBuildFile section */
@@ -73,6 +74,8 @@
 		5B4B127115227DFE00153613 /* Event.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Event.m; sourceTree = "<group>"; };
 		5B5E838C152BAB96009C1991 /* iCloudStoreManagerExample.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = iCloudStoreManagerExample.entitlements; sourceTree = "<group>"; };
 		5BBC288516CAF055004465F1 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
+		5BBC288716CAF453004465F1 /* UbiquityStoreManager+Alerts.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UbiquityStoreManager+Alerts.h"; sourceTree = "<group>"; };
+		5BBC288816CAF453004465F1 /* UbiquityStoreManager+Alerts.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UbiquityStoreManager+Alerts.m"; sourceTree = "<group>"; };
 		DA79AA3115585EBE00BAA07A /* iCloudStoreManagerExample-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "iCloudStoreManagerExample-Info.plist"; sourceTree = "<group>"; };
 		DA79AA3215585EBE00BAA07A /* iCloudStoreManagerExample-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iCloudStoreManagerExample-Prefix.pch"; sourceTree = "<group>"; };
 		DA79AA3C1558608500BAA07A /* iCloudStoreManager.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = iCloudStoreManager.xcdatamodel; sourceTree = "<group>"; };
@@ -198,6 +201,8 @@
 			children = (
 				DA79AA3F1558613F00BAA07A /* UbiquityStoreManager.h */,
 				DA79AA401558613F00BAA07A /* UbiquityStoreManager.m */,
+				5BBC288716CAF453004465F1 /* UbiquityStoreManager+Alerts.h */,
+				5BBC288816CAF453004465F1 /* UbiquityStoreManager+Alerts.m */,
 			);
 			path = iCloudStoreManager;
 			sourceTree = "<group>";
@@ -321,6 +326,7 @@
 				5B4B127215227DFE00153613 /* Event.m in Sources */,
 				DA79AA3D1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld in Sources */,
 				DA79AA411558613F00BAA07A /* UbiquityStoreManager.m in Sources */,
+				5BBC288916CAF453004465F1 /* UbiquityStoreManager+Alerts.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

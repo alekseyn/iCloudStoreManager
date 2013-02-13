@@ -508,6 +508,13 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     }
 }
 
+- (BOOL)hasBeenSeeded {
+    NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+    NSString *storeUUID = [cloud objectForKey:StoreUUIDKey];
+	
+	return (storeUUID != nil) || (self.tentativeStoreUUID != nil);
+}
+
 #pragma mark - NSFilePresenter
 
 - (NSURL *)presentedItemURL {
@@ -529,7 +536,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     [self cloudStoreChanged:nil];
     completionHandler(nil);
 }
-
 
 #pragma mark - Notifications
 
@@ -573,15 +579,14 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     [self.persistentStorageQueue addOperationWithBlock:^{
         NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
 		
-		// TODO: (AN) make it non-blocking. Add in dispatch_async below
-        [moc performBlockAndWait:^{
+        [moc performBlock:^{
             [moc mergeChangesFromContextDidSaveNotification:note];
-        }];
-		
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidImportChangesNotification object:self
-                                                              userInfo:[note userInfo]];
-        });
+
+			dispatch_async(dispatch_get_main_queue(), ^{
+				[[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidImportChangesNotification object:self
+																  userInfo:[note userInfo]];
+			});
+		}];
     }];
 }
 
