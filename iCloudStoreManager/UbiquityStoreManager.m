@@ -319,16 +319,24 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 [self observeStore];
             }
         }
+		@catch (NSException *exception) {
+			[self log:@"%@: %@", exception.name, exception.reason];
+		}
         @finally {
             [self.persistentStoreCoordinator unlock];
             self.loadingStore = NO;
+			
+			self.tentativeStoreUUID = nil;
         }
 		
-        [self log:@"iCloud enabled. %@",  [self.persistentStoreCoordinator.persistentStores count]? @"Loaded cloud store.": @"Failed to load cloud store."];
+		NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
+		[local setBool:self.hasBeenSeeded forKey:CloudEnabledKey];
+
+        [self log:@"iCloud enabled. %@", (self.hasBeenSeeded) ? @"Loaded cloud store.": @"Failed to load cloud store."];
         dispatch_async(dispatch_get_main_queue(), ^{
             [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
-                [self.delegate ubiquityStoreManager:self didSwitchToCloud:YES];
+                [self.delegate ubiquityStoreManager:self didSwitchToCloud:self.hasBeenSeeded];
         });
     }];
 }
@@ -372,37 +380,47 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 #endif
 }
 
+- (void)clearTransactionLogs {
+	
+    NSURL *url				= [[self URLForCloudContainer] URLByAppendingPathComponent:CloudLogsDirectory];
+	NSError *error			= nil;
+	NSFileCoordinator *fc	= [[NSFileCoordinator alloc] initWithFilePresenter:nil];
+	
+	[fc coordinateWritingItemAtURL: url
+						   options: NSFileCoordinatorWritingForDeleting
+							 error: &error
+						byAccessor: ^(NSURL *itemURL) {
+							NSError *error_ = nil;
+							
+							[[NSFileManager defaultManager] removeItemAtURL:itemURL error:&error_];
+							[self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:itemURL.path];
+ 						}];
+	if (error)
+		[self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:url.path];
+}
+
 - (void)nukeCloudContainer {
 	
-    NSURL *cloudContainerURL = [self URLForCloudContainer];
-    if (cloudContainerURL && [[NSFileManager defaultManager] fileExistsAtPath:cloudContainerURL.path]) {
-        [self.persistentStoreCoordinator lock];
-        [self clearStore];
+	[self.persistentStorageQueue addOperationWithBlock:^{
+		NSURL *cloudContainerURL = [self URLForCloudContainer];
 		
-        // Delete the contents of the cloud container.
-        NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
-        for (NSString     *subPath in [[NSFileManager defaultManager] subpathsAtPath:cloudContainerURL.path]) {
-            NSError *error = nil;
-            [coordinator coordinateWritingItemAtURL:[NSURL fileURLWithPath:subPath] options:NSFileCoordinatorWritingForDeleting
-                                              error:&error byAccessor:
-             ^(NSURL *newURL) {
-                 NSError *error_ = nil;
-                 if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
-                     [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
-             }];
+		if (cloudContainerURL && [[NSFileManager defaultManager] fileExistsAtPath:cloudContainerURL.path]) {
+			[self.persistentStoreCoordinator lock];
+			[self clearStore];
+			[self clearTransactionLogs];
 			
-            if (error)
-                [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:subPath];
-        }
-		
-        // Unset the storeUUID so a new one will be created.
-        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-        [cloud removeObjectForKey:StoreUUIDKey];
-        [cloud synchronize];
-		
-        [self.persistentStoreCoordinator unlock];
-        [self loadStore];
-    }
+			// Unset the storeUUID so a new one will be created.
+			NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+			[cloud removeObjectForKey:StoreUUIDKey];
+			[cloud synchronize];
+			
+			// Clear this just in case we got stuck in an expected state
+			self.tentativeStoreUUID = nil;
+			
+			[self.persistentStoreCoordinator unlock];
+			[self loadStore];
+		}
+	}];
 }
 
 - (void)deleteLocalStore {

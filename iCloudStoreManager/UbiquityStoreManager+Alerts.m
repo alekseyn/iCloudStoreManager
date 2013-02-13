@@ -287,7 +287,7 @@
 #pragma mark - Convenience methods
 
 - (void)didSwitchToCloud:(BOOL)didSwitch {
-	if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToiCloud:)]) {
+	if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)]) {
 		[self.delegate ubiquityStoreManager:self didSwitchToCloud:didSwitch];
 	}
 }

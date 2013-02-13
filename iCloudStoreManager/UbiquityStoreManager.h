@@ -48,7 +48,8 @@ typedef enum {
 
 @end
 
-@interface UbiquityStoreManager : NSObject <UIAlertViewDelegate>
+
+@interface UbiquityStoreManager : NSObject <NSFilePresenter, UIAlertViewDelegate>
 
 // The delegate provides the managed object context to use and is informed of events in the ubiquity manager.
 @property (nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
