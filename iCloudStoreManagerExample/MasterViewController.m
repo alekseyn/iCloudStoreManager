@@ -78,6 +78,12 @@
 	// iCloud support
 	[self reloadFetchedResults:nil];
 		
+	// Observe the app delegate telling us when it's finished asynchronously setting up the persistent store
+    [[NSNotificationCenter defaultCenter] addObserver: self
+											 selector: @selector(reloadFetchedResults:)
+												 name: UbiquityManagedStoreDidChangeNotification
+											   object: [[AppDelegate appDelegate] ubiquityStoreManager]];
+
 	self.tableView.tableHeaderView = self.tableHeaderView;
 
 	// STEP 5c - Display current state of the UbiquityStoreManager

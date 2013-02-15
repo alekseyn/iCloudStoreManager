@@ -29,9 +29,16 @@ typedef enum {
     UbiquityStoreManagerErrorCauseCreateStorePath, // Error occurred while creating the path where the store needs to be saved.
     UbiquityStoreManagerErrorCauseClearStore, // Error occurred while removing the active store from the coordinator.
     UbiquityStoreManagerErrorCauseOpenLocalStore, // Error occurred while opening the local store file.
+    UbiquityStoreManagerErrorCauseCreateCloudStore, // Error occurred while creating a new cloud store file.
     UbiquityStoreManagerErrorCauseOpenCloudStore, // Error occurred while opening the cloud store file.
     UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore, // Error occurred while migrating the local store to the cloud.
 }               UbiquityStoreManagerErrorCause;
+
+typedef enum {
+	UbiquityStoreManagerDataMigrationNone,
+	UbiquityStoreManagerDataMigrationAutomatic,
+	UbiquityStoreManagerDataMigrationManual
+} UbiquityStoreManagerDataMigrationType;
 
 @class UbiquityStoreManager;
 
@@ -62,6 +69,9 @@ typedef enum {
 
 // Check to see if the cloud store has ever been seeded
 @property (nonatomic, readonly) BOOL hasBeenSeeded;
+
+// Default is set to automatic. However, this is broken in iOS 6.1
+@property (nonatomic) UbiquityStoreManagerDataMigrationType dataMigrationType;
 
 /**
  *  Start managing an optionally ubiquitous store coordinator.  Default settings will be used.

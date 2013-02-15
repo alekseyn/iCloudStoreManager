@@ -20,6 +20,7 @@
 #define NOT_SIGNED_IN_ALERT_TAG		103
 #define SWITCH_TO_LOCAL_ALERT_TAG	104
 #define RESET_ALERT_TAG				105
+#define START_CLEAN_ALERT_TAG		106
 
 @implementation UbiquityStoreManager (Alerts)
 
@@ -35,14 +36,22 @@
 				// If an iCloud store already exists, ask the user if they want to switch over to iCloud
 				if (cloud) {
 					if (self.hasBeenSeeded) {
-						if ([self.URLForLocalStore checkResourceIsReachableAndReturnError:nil])
+						if ([self.URLForLocalStore checkResourceIsReachableAndReturnError:nil]) {
 							[self switchToCloudDataAlert];
+						}
 						else
 							self.cloudEnabled = YES;
 					}
 					else {
-						if ([self.URLForLocalStore checkResourceIsReachableAndReturnError:nil])
-							[self moveDataToCloudAlert];
+						if ([self.URLForLocalStore checkResourceIsReachableAndReturnError:nil]) {
+							if (self.dataMigrationType == UbiquityStoreManagerDataMigrationNone) {
+								
+								[self startWithCleanCloudDataAlert];
+							}
+							else {
+								[self moveDataToCloudAlert];
+							}
+						}
 						else
 							self.cloudEnabled = YES;
 					}
@@ -70,7 +79,13 @@
 
 #pragma mark - Message Strings
 
-// Subclass UbiquityStoreManager and override these methods if you want to customize these messages
+- (NSString *)startWithCleanCloudTitle {
+	return @"Start Using iCloud";
+}
+
+- (NSString *)startWithCleanCloudMessage {
+	return @"Would you like to start using iCloud to store all of your data? You're local data will not be moved to iCloud, but will be left intact if you choose to stop using iCloud.";
+}
 
 - (NSString *)moveDataToiCloudTitle {
 	return @"Move Data to iCloud";
@@ -124,19 +139,12 @@
 #pragma mark - UIAlertView
 
 - (void)alertView:(OS_Alert *)alertView didDismissWithButtonIndex:(NSInteger)buttonIndex {
-	if (alertView.tag == MOVE_TO_CLOUD_ALERT_TAG) {
+	if (alertView.tag == MOVE_TO_CLOUD_ALERT_TAG ||
+		alertView.tag == SWITCH_TO_CLOUD_ALERT_TAG ||
+		alertView.tag == START_CLEAN_ALERT_TAG) {
+		
 		if (buttonIndex == 1) {
 			// Move the data from the local store to the iCloud store
-			self.cloudEnabled = YES;
-		}
-		else {
-			[self didSwitchToCloud:NO];
-		}
-	}
-	
-	if (alertView.tag == SWITCH_TO_CLOUD_ALERT_TAG) {
-		if (buttonIndex == 1) {
-			// Switch to using data from iCloud
 			self.cloudEnabled = YES;
 		}
 		else {
@@ -202,6 +210,27 @@
     [self alertView:switchToiCloudAlert didDismissWithButtonIndex:button == NSAlertDefaultReturn? 1: 0];
 #endif
 	switchToiCloudAlert.tag = SWITCH_TO_CLOUD_ALERT_TAG;
+}
+
+- (void)startWithCleanCloudDataAlert {
+#if TARGET_OS_IPHONE
+	UIAlertView *alert = [[UIAlertView alloc] initWithTitle: [self startWithCleanCloudTitle]
+													message: [self startWithCleanCloudMessage]
+												   delegate: self
+										  cancelButtonTitle: @"Cancel"
+										  otherButtonTitles: @"Use iCloud", nil];
+	[alert show];
+#else
+    NSAlert *alert = [NSAlert alertWithMessageText: [self startWithCleanCloudTitle]
+									 defaultButton: @"Use iCloud"
+								   alternateButton: @"Cancel"
+									   otherButton: nil
+						 informativeTextWithFormat: [self startWithCleanCloudMessage]];
+	
+    NSInteger button = [alert runModal];
+    [self alertView:alert didDismissWithButtonIndex:button == NSAlertDefaultReturn? 1: 0];
+#endif
+	alert.tag = START_CLEAN_ALERT_TAG;
 }
 
 - (void)tryLaterAlert {
