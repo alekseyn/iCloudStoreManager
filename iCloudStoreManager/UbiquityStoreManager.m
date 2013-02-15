@@ -16,13 +16,14 @@
 
 #endif
 
-NSString *const UbiquityManagedStoreDidChangeNotification = @"UbiquityManagedStoreDidChangeNotification";
+NSString *const UbiquityManagedStoreDidChangeNotification		 = @"UbiquityManagedStoreDidChangeNotification";
 NSString *const UbiquityManagedStoreDidImportChangesNotification = @"UbiquityManagedStoreDidImportChangesNotification";
-NSString *const StoreUUIDKey                         = @"StoreUUIDKey";
-NSString *const CloudEnabledKey                      = @"CloudEnabledKey";
-NSString *const CloudIdentityKey                     = @"CloudIdentityKey";
-NSString *const CloudStoreDirectory                  = @"CloudStore.nosync";
-NSString *const CloudLogsDirectory                   = @"CloudLogs";
+
+NSString *const StoreUUIDKey                         = @"iCloudUUIDKey";
+NSString *const CloudEnabledKey                      = @"iCloudEnabledKey";
+NSString *const CloudIdentityKey                     = @"iCloudIdentityKey";
+NSString *const CloudStoreDirectory                  = @"Database.nosync";
+NSString *const CloudLogsDirectory                   = @"Data";
 
 @interface UbiquityStoreManager ()<NSFilePresenter>
 

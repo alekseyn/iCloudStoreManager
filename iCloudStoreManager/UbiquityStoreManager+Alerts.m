@@ -84,7 +84,7 @@
 }
 
 - (NSString *)startWithCleanCloudMessage {
-	return @"Would you like to start using iCloud to store all of your data? You're local data will not be moved to iCloud, but will be left intact if you choose to stop using iCloud.";
+	return @"Would you like to start using iCloud to store all of your data? Your local data will not be moved to iCloud, but will be left intact if you choose to stop using iCloud.";
 }
 
 - (NSString *)moveDataToiCloudTitle {
