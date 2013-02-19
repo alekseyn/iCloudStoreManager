@@ -29,7 +29,7 @@
 	UISwitch *aSwitch = sender;
 	
 	// STEP 5a - Set the state of the UbiquityStoreManager to reflect the current UI
-	[[[AppDelegate appDelegate] ubiquityStoreManager] useiCloudStore:aSwitch.on alertUser:YES];
+	[[[AppDelegate appDelegate] ubiquityStoreManager] enableiCloudStore:aSwitch.on alertUser:YES];
 }
 
 - (IBAction)cleariCloud:(id)sender {
@@ -114,7 +114,7 @@
 	NSManagedObjectContext *context = [self.fetchedResultsController managedObjectContext];
 	User *user = [[[AppDelegate appDelegate] primaryUser] userInContext:context];
 
-	[context performBlockAndWait:^{
+	[context performBlock:^{
 		NSEntityDescription *entity = [[self.fetchedResultsController fetchRequest] entity];
 		NSManagedObject *newManagedObject = [NSEntityDescription insertNewObjectForEntityForName:[entity name] inManagedObjectContext:context];
 		
@@ -180,7 +180,7 @@
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         NSManagedObjectContext *context = [self.fetchedResultsController managedObjectContext];
 		
-		[context performBlockAndWait:^{
+		[context performBlock:^{
 			[context deleteObject:[self.fetchedResultsController objectAtIndexPath:indexPath]];
 			
 			NSError *error = nil;
@@ -251,15 +251,13 @@
     aFetchedResultsController.delegate = self;
     self.fetchedResultsController = aFetchedResultsController;
     
-	[self.managedObjectContext performBlockAndWait:^{
-		NSError *error = nil;
-		if (![self.fetchedResultsController performFetch:&error]) {
-			// Replace this implementation with code to handle the error appropriately.
-			// abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development. 
-			NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
-			abort();
-		}
-	}];
+	NSError *error = nil;
+	if (![self.fetchedResultsController performFetch:&error]) {
+		// Replace this implementation with code to handle the error appropriately.
+		// abort() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development. 
+		NSLog(@"Unresolved error %@, %@", error, [error userInfo]);
+		abort();
+	}
     
     return __fetchedResultsController;
 }    

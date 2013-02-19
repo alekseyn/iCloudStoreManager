@@ -14,12 +14,15 @@
 #define OS_Alert NSAlert
 #endif
 
+#define MIGRATE_LOCAL_STORE	NO
+
 NSString * const RefetchAllDatabaseDataNotificationKey	= @"RefetchAllDatabaseData";
 NSString * const RefreshAllViewsNotificationKey			= @"RefreshAllViews";
 
 NSString *LocalUUIDKey			= @"LocalUUIDKey";
 NSString *iCloudUUIDKey			= @"iCloudUUIDKey";
 NSString *iCloudEnabledKey		= @"iCloudEnabledKey";
+NSString *CurrentUbiquityToken	= @"CurrentUbiquityToken";
 NSString *DatabaseDirectoryName	= @"Database.nosync";
 NSString *DataDirectoryName		= @"Data";
 
@@ -29,7 +32,6 @@ static NSOperationQueue *_presentedItemOperationQueue;
     NSDictionary *additionalStoreOptions__;
     NSString *containerIdentifier__;
 	NSManagedObjectModel *model__;
-	NSPersistentStoreCoordinator *persistentStoreCoordinator__;
 	NSPersistentStore *persistentStore__;
 	NSURL *localStoreURL__;
 	OS_Alert *moveDataAlert;
@@ -38,16 +40,14 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	OS_Alert *hardResetAlert;
 	dispatch_queue_t persistentStorageQueue;
 	NSURL *_presentedItemURL;
+	NSURL *_cloudURL;
 }
 
+@property (nonatomic, readonly) BOOL isSignedIn;
 @property (nonatomic) NSString *localUUID;
 @property (nonatomic) NSString *iCloudUUID;
+@property (nonatomic) id currentUbiquityToken;
 
-- (NSString *)freshUUID;
-- (void)registerForNotifications;
-- (void)removeNotifications;
-- (void)migrate:(BOOL)migrate andUseCloudStorageWithUUID:(NSString *)uuid completionBlock:(void (^)(BOOL usingiCloud))completionBlock;
-- (void)checkiCloudStatus;
 @end
 
 
@@ -63,39 +63,15 @@ static NSOperationQueue *_presentedItemOperationQueue;
     }
 }
 
-- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL
-             containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions {
-	self = [super init];
-	if (self) {
-        additionalStoreOptions__ = additionalStoreOptions;
-        containerIdentifier__ = containerIdentifier;
-		model__ = model;
-		localStoreURL__ = storeURL;
-		persistentStorageQueue = dispatch_queue_create([@"PersistentStorageQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
-		
-		// Start iCloud connection
-		[self updateLocalCopyOfiCloudUUID];
-		
-		[self checkiCloudStatus];
-		[self registerForNotifications];
-	}
-	
-	return self;
-}
-
 - (void)dealloc {
 	[self removeNotifications];
 	[NSFileCoordinator removeFilePresenter:self];
-	
-	dispatch_release(persistentStorageQueue);
 }
 
 #pragma mark - File Handling
 
 - (NSURL *)iCloudStoreURLForUUID:(NSString *)uuid {
-	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
-	NSString *databaseContent	= [[cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
+	NSString *databaseContent	= [[_cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
 	NSString *storePath			= [databaseContent stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.sqlite", uuid]];
 	
 	return [NSURL fileURLWithPath:storePath];
@@ -103,8 +79,7 @@ static NSOperationQueue *_presentedItemOperationQueue;
 
 - (void)deleteCloudStoreDirectory {
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
-	NSString *databaseContent	= [[cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
+	NSString *databaseContent	= [[_cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
 	
 	if ([fileManager fileExistsAtPath:databaseContent]) {
 		NSError *error = nil;
@@ -119,8 +94,7 @@ static NSOperationQueue *_presentedItemOperationQueue;
 
 - (void)createStoreDirectoryIfNecessary {
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
-	NSString *databaseContent	= [[cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
+	NSString *databaseContent	= [[_cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
 	
 	if (![fileManager fileExistsAtPath:databaseContent]) {
 		NSError *error = nil;
@@ -133,9 +107,7 @@ static NSOperationQueue *_presentedItemOperationQueue;
 }
 
 - (NSURL *)transactionLogsURL {
-	NSFileManager *fileManager		= [NSFileManager defaultManager];
-	NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
-	NSString* coreDataCloudContent	= [[cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
+	NSString* coreDataCloudContent = [[_cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
 	
 	return [NSURL fileURLWithPath:coreDataCloudContent];
 }
@@ -192,6 +164,15 @@ static NSOperationQueue *_presentedItemOperationQueue;
 
 - (NSString *)tryLaterMessage {
 	return @"iCloud is not currently available. Please try again later.";
+}
+
+
+- (NSString *)notSignedInTitle {
+	return @"iCloud Not Configured";
+}
+
+- (NSString *)notSignedInMessage {
+	return @"Open iCloud Settings, and make sure you are logged in.";
 }
 
 
@@ -301,10 +282,28 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	[alert show];
 #else
     NSAlert *alert = [NSAlert alertWithMessageText:[self tryLaterTitle]
-                                          defaultButton:@"Cancel"
-                                        alternateButton:nil
-                                            otherButton:nil
-                              informativeTextWithFormat:[self tryLaterMessage]];
+									 defaultButton:@"Cancel"
+								   alternateButton:nil
+									   otherButton:nil
+						 informativeTextWithFormat:[self tryLaterMessage]];
+    [alert runModal];
+#endif
+}
+
+- (void)notSignedInAlert {
+#if TARGET_OS_IPHONE
+	UIAlertView *alert = [[UIAlertView alloc] initWithTitle: [self notSignedInTitle]
+													message: [self notSignedInMessage]
+												   delegate: nil
+										  cancelButtonTitle: @"Done"
+										  otherButtonTitles: nil];
+	[alert show];
+#else
+    NSAlert *alert = [NSAlert alertWithMessageText:[self notSignedInTitle]
+									 defaultButton:@"Cancel"
+								   alternateButton:nil
+									   otherButton:nil
+						 informativeTextWithFormat:[self notSignedInMessage]];
     [alert runModal];
 #endif
 }
@@ -363,10 +362,9 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	NSArray *fileList = nil;
 
 	NSFileManager *fileManager	= [NSFileManager defaultManager];
-	NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
 	
-	if (cloudURL)
-		fileList = [fileManager subpathsAtPath:[cloudURL path]];
+	if (_cloudURL)
+		fileList = [fileManager subpathsAtPath:[_cloudURL path]];
 	
 	return fileList;
 }
@@ -376,7 +374,7 @@ static NSOperationQueue *_presentedItemOperationQueue;
 - (void)clearPersistentStore {
 	if (persistentStore__) {
 		NSError *error = nil;
-		[persistentStoreCoordinator__ removePersistentStore:persistentStore__ error:&error];
+		[_persistentStoreCoordinator removePersistentStore:persistentStore__ error:&error];
 		persistentStore__ = nil;
 		
 		if (error)
@@ -385,36 +383,23 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	}
 }
 
-- (NSPersistentStoreCoordinator *)persistentStoreCoordinator {
+- (void)migrate:(BOOL)migrate toiCloudWithUUID:(NSString *)uuid {
+	NSDictionary *cloudOptions;
+	NSDictionary *migrateOptions;
+
+	NSAssert([[_persistentStoreCoordinator persistentStores] count] == 0, @"There were more persistent stores than expected");
 	
-    if (persistentStoreCoordinator__ == nil) {
-		persistentStoreCoordinator__ = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel: model__];
-		
-		NSString *uuid = (self.iCloudEnabled) ? self.localUUID : nil;
-		[self migrate:NO andUseCloudStorageWithUUID:uuid completionBlock:nil];
-    }
-    return persistentStoreCoordinator__;
-}
-
-- (void)migrateToiCloud:(BOOL)migrate persistentStoreCoordinator:(NSPersistentStoreCoordinator *)psc with:(NSString *)uuid {
-	NSMutableDictionary *options;
-
-	NSAssert([[psc persistentStores] count] == 0, @"There were more persistent stores than expected");
-
 	[self createStoreDirectoryIfNecessary];
 	
 	NSError *error = nil;
 	NSURL *transactionLogsURLForSpecificUUID = [self transactionLogsURLForUUID:uuid];
 	
-	options = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-			   uuid, NSPersistentStoreUbiquitousContentNameKey,
-			   transactionLogsURLForSpecificUUID, NSPersistentStoreUbiquitousContentURLKey,
-			   [NSNumber numberWithBool:YES], NSMigratePersistentStoresAutomaticallyOption,
-			   [NSNumber numberWithBool:YES], NSInferMappingModelAutomaticallyOption,
-			   nil];
-    [options addEntriesFromDictionary:additionalStoreOptions__];
+	cloudOptions = @{	NSPersistentStoreUbiquitousContentNameKey: uuid,
+						NSPersistentStoreUbiquitousContentURLKey: transactionLogsURLForSpecificUUID,
+						NSMigratePersistentStoresAutomaticallyOption:@YES,
+						NSInferMappingModelAutomaticallyOption: @YES };
 	
-	[psc lock];
+	migrateOptions = @{ NSReadOnlyPersistentStoreOption: @YES };
 	
     NSURL *cloudStoreURL = [self iCloudStoreURLForUUID:uuid];
 	if (migrate) {
@@ -423,79 +408,92 @@ static NSOperationQueue *_presentedItemOperationQueue;
 		// from this NSManagedObjectContext's coordinator)
 		[[NSNotificationCenter defaultCenter] removeObserver: self 
 														name: NSPersistentStoreDidImportUbiquitousContentChangesNotification
-													  object: psc];
+													  object: _persistentStoreCoordinator];
 
 		// Add the store to migrate
-		NSPersistentStore * migratedStore = [psc addPersistentStoreWithType: NSSQLiteStoreType
-															  configuration: nil 
-																		URL: localStoreURL__
-																	options: additionalStoreOptions__
-																	  error: &error];
+		NSPersistentStore *migratedStore;
+		
+		if (MIGRATE_LOCAL_STORE) {
+			migratedStore = [_persistentStoreCoordinator addPersistentStoreWithType: NSSQLiteStoreType
+																	  configuration: nil
+																				URL: localStoreURL__
+																			options: migrateOptions
+																			  error: &error];
+		}
 
 		if (error)
             if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
                 [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL__];
 
 		error = nil;
-		persistentStore__ = [psc migratePersistentStore: migratedStore 
-												  toURL: cloudStoreURL
-												options: options
-											   withType: NSSQLiteStoreType
-												  error: &error];
-
-		[[NSNotificationCenter defaultCenter]addObserver: self 
+		if (MIGRATE_LOCAL_STORE) {
+			persistentStore__ = [_persistentStoreCoordinator migratePersistentStore: migratedStore
+																			  toURL: cloudStoreURL
+																			options: cloudOptions
+																		   withType: NSSQLiteStoreType
+																			  error: &error];
+		}
+		else {
+			persistentStore__ = [_persistentStoreCoordinator addPersistentStoreWithType: NSSQLiteStoreType
+																		  configuration: nil
+																					URL: cloudStoreURL
+																				options: cloudOptions
+																				  error: &error];
+		}
+		[[NSNotificationCenter defaultCenter]addObserver: self
 												selector: @selector(mergeChanges:) 
-													name: NSPersistentStoreDidImportUbiquitousContentChangesNotification 
-												  object: psc];
+													name: NSPersistentStoreDidImportUbiquitousContentChangesNotification
+												  object: _persistentStoreCoordinator];
 	}
 	else {
-		persistentStore__ = [psc addPersistentStoreWithType: NSSQLiteStoreType
+		persistentStore__ = [_persistentStoreCoordinator addPersistentStoreWithType: NSSQLiteStoreType
 											  configuration: nil
 														URL: cloudStoreURL
-													options: options
+													options: cloudOptions
 													  error: &error];
 	}
-	[psc unlock];
 	
-	if (error)
+	if (error) {
         if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
             [self.delegate ubiquityStoreManager:self didEncounterError:error cause:UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL];
-        else {
+		else {
             NSLog(@"Persistent store error: %@", error);
-            NSAssert([[psc persistentStores] count] == 1, @"Not the expected number of persistent stores");
+            NSAssert([[_persistentStoreCoordinator persistentStores] count] == 1, @"Not the expected number of persistent stores");
         }
+	}
 }
 
-- (void)migrate:(BOOL)migrate andUseCloudStorageWithUUID:(NSString *)uuid completionBlock:(void (^)(BOOL usingiCloud))completionBlock {
-    if (persistentStoreCoordinator__ == nil)
-		persistentStoreCoordinator__ = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel: model__];
+- (void)useCloudStoreUUID:(NSString *)uuid withMigration:(BOOL)migrate completionBlock:(void (^)(BOOL usingiCloud))completionBlock {
+	if (_cloudURL == nil)
+		_cloudURL = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:containerIdentifier__];
 	
     if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:log:)])
         [self.delegate ubiquityStoreManager:self log:[NSString stringWithFormat:@"Setting up store with UUID: %@", uuid]];
 
-	BOOL willUseiCloud = (uuid != nil);
+	// TODO: Check this. Recommended by https://github.com/alekseyn/iCloudStoreManager/issues/8
+	_isReady = NO;
+	
+	BOOL useLocalStore = !uuid;
 	
 	// TODO: Check for use case where user checks out of one iCloud account, and logs into another!
 	
-    NSPersistentStoreCoordinator* psc = persistentStoreCoordinator__;
+    NSPersistentStoreCoordinator* psc = _persistentStoreCoordinator;
 	
 	// Do this asynchronously since if this is the first time this particular device is syncing with preexisting
 	// iCloud content it may take a long long time to download
     dispatch_async(persistentStorageQueue, ^{
-        NSFileManager *fileManager = [NSFileManager defaultManager];
 		NSMutableDictionary *options;
 		
 		// Clear previous persistentStore
 		[self clearPersistentStore];
 		
-        NSURL *cloudURL					= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
-        NSString* coreDataCloudContent	= [[cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
+        NSString* coreDataCloudContent	= [[_cloudURL path] stringByAppendingPathComponent:DataDirectoryName];
 		
-		BOOL usingiCloud = ([coreDataCloudContent length] != 0) && willUseiCloud;
+		BOOL usingiCloud = ([coreDataCloudContent length] != 0) && !useLocalStore;
 		
 		if (usingiCloud) {
 			// iCloud is available
-			[self migrateToiCloud:migrate persistentStoreCoordinator:psc with:uuid];
+			[self migrate:migrate toiCloudWithUUID:uuid];
 		}
 		else {
 			// iCloud is not available
@@ -538,16 +536,17 @@ static NSOperationQueue *_presentedItemOperationQueue;
 
         dispatch_async(dispatch_get_main_queue(), ^{
 			[[NSNotificationCenter defaultCenter] postNotificationName:RefetchAllDatabaseDataNotificationKey object:self userInfo:nil];
-			[self didSwitchToiCloud:willUseiCloud];
+			[self didSwitchToiCloud:!useLocalStore];
         });
     });
 }
 
+#pragma mark - iCloud/Local Store
+
 - (void)useCloudStorage {
-	[self migrate:NO andUseCloudStorageWithUUID:self.iCloudUUID completionBlock:^(BOOL usingiCloud) {
+	[self useCloudStoreUUID:self.iCloudUUID withMigration:NO completionBlock:^(BOOL usingiCloud) {
 		if (usingiCloud) {
 			self.localUUID = self.iCloudUUID;
-			self.iCloudEnabled = YES;
 			
 			_presentedItemURL = [self transactionLogsURL];
 			[NSFileCoordinator addFilePresenter:self];
@@ -556,9 +555,8 @@ static NSOperationQueue *_presentedItemOperationQueue;
 }
 
 - (void)useLocalStorage {
-	[self migrate:NO andUseCloudStorageWithUUID:nil completionBlock:^(BOOL usingiCloud) {
+	[self useCloudStoreUUID:nil withMigration:NO completionBlock:^(BOOL usingiCloud) {
 		self.localUUID = nil;
-		self.iCloudEnabled = NO;
 		
 		[NSFileCoordinator removeFilePresenter:self];
 		_presentedItemURL = nil;
@@ -566,11 +564,10 @@ static NSOperationQueue *_presentedItemOperationQueue;
 }
 
 - (void)setupCloudStorageWithUUID:(NSString *)uuid {
-	[self migrate:YES andUseCloudStorageWithUUID:uuid completionBlock:^(BOOL usingiCloud) {
+	[self useCloudStoreUUID:uuid withMigration:YES completionBlock:^(BOOL usingiCloud) {
 		if (usingiCloud) {
 			self.localUUID		= uuid;
 			self.iCloudUUID		= uuid;
-			self.iCloudEnabled	= YES;
 			
 			_presentedItemURL = [self transactionLogsURL];
 			[NSFileCoordinator addFilePresenter:self];
@@ -579,10 +576,9 @@ static NSOperationQueue *_presentedItemOperationQueue;
 }
 
 - (void)replaceiCloudStoreWithUUID:(NSString *)uuid {
-	[self migrate:NO andUseCloudStorageWithUUID:uuid completionBlock:^(BOOL usingiCloud) {
+	[self useCloudStoreUUID:uuid withMigration:NO completionBlock:^(BOOL usingiCloud) {
 		if (usingiCloud) {
-			self.localUUID		= uuid;
-			self.iCloudEnabled	= YES;
+			self.localUUID = uuid;
 			
 			if (!_presentedItemURL) {
 				_presentedItemURL = [self transactionLogsURL];
@@ -590,20 +586,12 @@ static NSOperationQueue *_presentedItemOperationQueue;
 			}
 		}
 		else {
-			self.localUUID		= nil;
-			self.iCloudEnabled	= NO;
+			self.localUUID = nil;
 
 			[NSFileCoordinator removeFilePresenter:self];
 			_presentedItemURL = nil;
 		}
 	}];
-}
-
-- (NSURL *)currentStoreURL {
-	if (self.iCloudEnabled)
-		return [self iCloudStoreURLForUUID:self.iCloudUUID];
-	else
-		return localStoreURL__;
 }
 
 - (void)hardResetCloudStorage {
@@ -614,60 +602,93 @@ static NSOperationQueue *_presentedItemOperationQueue;
 		
 		// iCloud store no longer in use or available
 		self.iCloudUUID = nil;
+		
+		// Delete local database
+		NSString *databaseContent = [[_cloudURL path] stringByAppendingPathComponent:DatabaseDirectoryName];
+		
+		NSError *error;
+		[[NSFileManager defaultManager] removeItemAtPath:databaseContent error:&error];
 	}
 }
 
-#pragma mark - Top Level Methods
+#pragma mark - External API Methods
 
-- (void)checkiCloudStatus {
-	if (self.iCloudEnabled) {
-		NSFileManager *fileManager	= [NSFileManager defaultManager];
-		NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
+//- (void)checkiCloudStatus {
+//	if (self.iCloudEnabled) {
+//		NSFileManager *fileManager	= [NSFileManager defaultManager];
+//		NSURL *cloudURL				= [fileManager URLForUbiquityContainerIdentifier:containerIdentifier__];
+//
+//		// If we have only one file/directory (Documents directory), then iCloud data has been deleted by user
+//		if ((cloudURL == nil) || [[self fileList] count] < 2)
+//			[self useLocalStorage];
+//	}
+//}
 
-		// If we have only one file/directory (Documents directory), then iCloud data has been deleted by user
-		if ((cloudURL == nil) || [[self fileList] count] < 2)
-			[self useLocalStorage];
+- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL
+             containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions {
+	self = [super init];
+	if (self) {
+        additionalStoreOptions__		= additionalStoreOptions;
+        containerIdentifier__			= containerIdentifier;
+		model__							= model;
+		localStoreURL__					= storeURL;
+		persistentStorageQueue			= dispatch_queue_create([@"PersistentStorageQueue" UTF8String], DISPATCH_QUEUE_SERIAL);
+		_persistentStoreCoordinator		= [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel: model__];
+		
+		self.currentUbiquityToken		= [[NSFileManager defaultManager] ubiquityIdentityToken];
+		
+		// Start iCloud connection
+		[self updateLocalCopyOfiCloudUUID];
+		[self enableiCloudStore:self.iCloudEnabled alertUser:NO];
+		
+		[self registerForNotifications];
 	}
+	
+	return self;
 }
 
-- (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser {
+- (void)enableiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser {
 	// To provide the option of using iCloud immediately upon first running of an app,
 	// make sure a persistentStoreCoordinator exists.
 	
-    if (persistentStoreCoordinator__ == nil)
-		persistentStoreCoordinator__ = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel: model__];
-	
-	if (willUseiCloud) {
-		if (!self.iCloudEnabled) {
-			NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-			
-			// If an iCloud store already exists, ask the user if they want to switch over to iCloud
-			if (cloud) {
-				if (self.iCloudUUID) {
-                    if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
-                        [self switchToiCloudDataAlert];
-                    else
-                        [self useCloudStorage];
+	if (self.isSignedIn) {
+		if (willUseiCloud) {
+			if (!self.iCloudEnabled) {
+				NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+				
+				// If an iCloud store already exists, ask the user if they want to switch over to iCloud
+				if (cloud) {
+					if (self.iCloudUUID) {
+						if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
+							[self switchToiCloudDataAlert];
+						else
+							[self useCloudStorage];
+					}
+					else {
+						if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
+							[self moveDataToiCloudAlert];
+						else
+							[self setupCloudStorageWithUUID:[self freshUUID]];
+					}
 				}
-				else {
-                    if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
-                        [self moveDataToiCloudAlert];
-                    else
-                        [self setupCloudStorageWithUUID:[self freshUUID]];
+				else if (alertUser) {
+					[self tryLaterAlert];
 				}
 			}
-			else if (alertUser) {
-				[self tryLaterAlert];
+		}
+		else {
+			if (self.iCloudEnabled) {
+				if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
+					[self switchToLocalDataAlert];
+			}
+			else {
+				[self useLocalStorage];
 			}
 		}
 	}
 	else {
-		if (self.iCloudEnabled) {
-            if (alertUser && [localStoreURL__ checkResourceIsReachableAndReturnError:nil])
-                [self switchToLocalDataAlert];
-            else
-                [self useLocalStorage];
-		}
+		[self notSignedInAlert];
+		[self didSwitchToiCloud:NO];
 	}
 }
 
@@ -677,16 +698,44 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	}
 }
 
-#pragma mark - Properties
-
-- (BOOL)iCloudEnabled {
-	NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
-	return [local boolForKey:iCloudEnabledKey];
+- (void)applicationResumed {
+    id token = [[NSFileManager defaultManager] ubiquityIdentityToken];
+    if (self.currentUbiquityToken != token) {
+        if (![self.currentUbiquityToken isEqual:token]) {
+            [self iCloudAccountChanged:nil];
+        }
+    }
 }
 
-- (void)setICloudEnabled:(BOOL)enabled {
+#pragma mark - iCloud Account
+
+- (void)iCloudAccountChanged:(NSNotification *)notification {
+    // Update the current ubiquity token
+    self.currentUbiquityToken = [[NSFileManager defaultManager] ubiquityIdentityToken];
+    
+    // TODO: Is this the right thing to do?
+    [self enableiCloudStore:NO alertUser:YES];
+}
+
+#pragma mark - Properties
+
+- (BOOL)isSignedIn {
+	return (self.currentUbiquityToken != nil);
+}
+
+- (BOOL)iCloudEnabled {
+	return (self.localUUID != nil) && self.isSignedIn;
+}
+
+- (id)currentUbiquityToken {
 	NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
-	[local setBool:enabled forKey:iCloudEnabledKey];
+	return [local objectForKey:CurrentUbiquityToken];
+}
+
+- (void)setCurrentUbiquityToken:(id)currentUbiquityToken {
+	NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
+	[local setObject:currentUbiquityToken forKey:CurrentUbiquityToken];
+	[local synchronize];
 }
 
 - (NSString *)freshUUID {
@@ -765,7 +814,7 @@ static NSOperationQueue *_presentedItemOperationQueue;
 	
 	dispatch_async(persistentStorageQueue, ^{
 		NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
-		[moc performBlockAndWait:^{
+		[moc performBlock:^{
 			[moc mergeChangesFromContextDidSaveNotification:note]; 
 		}];
 		
@@ -790,6 +839,11 @@ static NSOperationQueue *_presentedItemOperationQueue;
 											selector: @selector(mergeChanges:) 
 												name: NSPersistentStoreDidImportUbiquitousContentChangesNotification 
 											  object: nil];
+	
+	[[NSNotificationCenter defaultCenter] addObserver: self
+											 selector: @selector(iCloudAccountChanged:)
+												 name: NSUbiquityIdentityDidChangeNotification
+											   object: nil];
 	
 }
 

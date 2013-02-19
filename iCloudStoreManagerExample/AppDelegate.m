@@ -43,7 +43,7 @@
 	// STEP 2a  - Setup the delegate
 	ubiquityStoreManager.delegate = self;
 	
-	// For test purposes only. NOT FOR USE IN PRODUCTION
+	// For test purposes only. NOT RECOMMENDED FOR USE IN PRODUCTION
 	ubiquityStoreManager.hardResetEnabled = YES;
 
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
@@ -87,7 +87,7 @@
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
 	// STEP 2b - Check to make sure user has not deleted the iCloud data from Settings
-	[self.ubiquityStoreManager checkiCloudStatus];
+	[self.ubiquityStoreManager applicationResumed];
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
@@ -106,7 +106,7 @@
 	
     if (managedObjectContext != nil) {
         if ([managedObjectContext hasChanges]) {
-			[managedObjectContext performBlockAndWait:^{
+			[managedObjectContext performBlock:^{
 				NSError *error = nil;
 
 				if (![managedObjectContext save:&error]) {
@@ -134,10 +134,7 @@
 	
     if (coordinator != nil) {
 		NSManagedObjectContext* moc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-        
-        [moc performBlockAndWait:^{
-            [moc setPersistentStoreCoordinator: coordinator];
-		}];
+        [moc setPersistentStoreCoordinator: coordinator];
 		
         __managedObjectContext = moc;
  		__managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
@@ -160,16 +157,9 @@
 	return [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"Sample.sqlite"];
 }
 
-// Returns the persistent store coordinator for the application.
-// If the coordinator doesn't already exist, it is created and the application's store added to it.
 - (NSPersistentStoreCoordinator *)persistentStoreCoordinator {
-    if (__persistentStoreCoordinator == nil) {
-		
-		// STEP 3 - Get the persistentStoreCoordinator from the UbiquityStoreManager
-        __persistentStoreCoordinator = [ubiquityStoreManager persistentStoreCoordinator];
-    }
-    
-    return __persistentStoreCoordinator;
+	// STEP 3 - Get the persistentStoreCoordinator from the UbiquityStoreManager
+	return [ubiquityStoreManager persistentStoreCoordinator];
 }
 
 #pragma mark - Application's Documents directory

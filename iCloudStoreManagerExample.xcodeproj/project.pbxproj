@@ -28,6 +28,7 @@
 		5B4B126415227C6E00153613 /* iCloudStoreManagerTests.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B126315227C6E00153613 /* iCloudStoreManagerTests.m */; };
 		5B4B126F15227DFE00153613 /* User.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B126E15227DFE00153613 /* User.m */; };
 		5B4B127215227DFE00153613 /* Event.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B127115227DFE00153613 /* Event.m */; };
+		5BFB0C9A16C837750052E7BB /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 5BFB0C9916C837750052E7BB /* Default-568h@2x.png */; };
 		DA79AA3D1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = DA79AA3B1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld */; };
 		DA79AA411558613F00BAA07A /* UbiquityStoreManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DA79AA401558613F00BAA07A /* UbiquityStoreManager.m */; };
 /* End PBXBuildFile section */
@@ -71,6 +72,7 @@
 		5B4B127015227DFE00153613 /* Event.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Event.h; sourceTree = "<group>"; };
 		5B4B127115227DFE00153613 /* Event.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Event.m; sourceTree = "<group>"; };
 		5B5E838C152BAB96009C1991 /* iCloudStoreManagerExample.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = iCloudStoreManagerExample.entitlements; sourceTree = "<group>"; };
+		5BFB0C9916C837750052E7BB /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		DA79AA3115585EBE00BAA07A /* iCloudStoreManagerExample-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "iCloudStoreManagerExample-Info.plist"; sourceTree = "<group>"; };
 		DA79AA3215585EBE00BAA07A /* iCloudStoreManagerExample-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iCloudStoreManagerExample-Prefix.pch"; sourceTree = "<group>"; };
 		DA79AA3C1558608500BAA07A /* iCloudStoreManager.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = iCloudStoreManager.xcdatamodel; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 		5B4B121715227C6D00153613 = {
 			isa = PBXGroup;
 			children = (
+				5BFB0C9916C837750052E7BB /* Default-568h@2x.png */,
 				DA79AA3E1558613F00BAA07A /* iCloudStoreManager */,
 				5B4B122E15227C6D00153613 /* iCloudStoreManagerExample */,
 				5B4B125C15227C6E00153613 /* iCloudStoreManagerTests */,
@@ -244,7 +247,7 @@
 		5B4B121915227C6D00153613 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastUpgradeCheck = 0430;
+				LastUpgradeCheck = 0460;
 				ORGANIZATIONNAME = "Yodel Code LLC";
 			};
 			buildConfigurationList = 5B4B121C15227C6D00153613 /* Build configuration list for PBXProject "iCloudStoreManagerExample" */;
@@ -275,6 +278,7 @@
 				5B4B124815227C6E00153613 /* MasterViewController_iPad.xib in Resources */,
 				5B4B124B15227C6E00153613 /* DetailViewController_iPhone.xib in Resources */,
 				5B4B124E15227C6E00153613 /* DetailViewController_iPad.xib in Resources */,
+				5BFB0C9A16C837750052E7BB /* Default-568h@2x.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -396,6 +400,10 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				COPY_PHASE_STRIP = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -423,6 +431,10 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				COPY_PHASE_STRIP = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu99;
@@ -443,11 +455,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = iCloudStoreManagerExample/iCloudStoreManagerExample.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "iCloudStoreManagerExample/iCloudStoreManagerExample-Prefix.pch";
 				INFOPLIST_FILE = "iCloudStoreManagerExample/iCloudStoreManagerExample-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Debug;
@@ -456,12 +470,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = iCloudStoreManagerExample/iCloudStoreManagerExample.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer: Aleksey Novicov (948LHQK32F)";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer: Aleksey Novicov (948LHQK32F)";
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "iCloudStoreManagerExample/iCloudStoreManagerExample-Prefix.pch";
 				INFOPLIST_FILE = "iCloudStoreManagerExample/iCloudStoreManagerExample-Info.plist";
-				IPHONEOS_DEPLOYMENT_TARGET = 5.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE = "466222DD-0EDA-40B2-BABA-138AB8522A86";
 				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "466222DD-0EDA-40B2-BABA-138AB8522A86";
 				WRAPPER_EXTENSION = app;
 			};

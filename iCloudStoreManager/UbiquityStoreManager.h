@@ -62,7 +62,7 @@ typedef enum {
 @property (nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
 
 // This property indicates whether the iCloud store or the local store is in use. To
-// change state of this property, use useiCloudStore: method
+// change state of this property, use enableiCloudStore: method
 @property (nonatomic, readonly) BOOL iCloudEnabled;
 
 // This property indicates when the persistentStoreCoordinator is ready. This property
@@ -73,34 +73,29 @@ typedef enum {
 // to set this to NO for production deployment
 @property (nonatomic) BOOL hardResetEnabled;
 
+// Always use this property to retrieve the main persistentStoreCoordinator
+@property (nonatomic, readonly) NSPersistentStoreCoordinator *persistentStoreCoordinator;
+
+
 // Start by instantiating a UbiquityStoreManager with a managed object model. A valid localStoreURL
 // is also required even if iCloud support is not currently enabled for this device. If it is enabled,
 // it is required in case the user disables iCloud support for this device. If iCloud support is disabled
 // after being initially enabled, the store on iCloud is NOT migrated back to the local device.
-- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL
-             containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions;
-
-// Always use this method to instantiate or retrieve the main persistentStoreCoordinator.
-- (NSPersistentStoreCoordinator *)persistentStoreCoordinator;
+- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)storeURL containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions;
 
 // If the user has decided to start using iCloud, call this method. And vice versa.
-- (void)useiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser;
+- (void)enableiCloudStore:(BOOL)willUseiCloud alertUser:(BOOL)alertUser;
 
 // Reset iCloud data store with warning
 - (void)resetiCloudAlert;
 
-// Immediately delete local store
-- (void)hardResetLocalStorage;
+// To be called every time the app resumes
+- (void)applicationResumed;
 
-// Checks iCloud to ensure user has not deleted all iCloud data (nuke all use case).
-// If the iCloud data has been deleted from within the Settings app or Mac System Preferences,
-// iCloud will be disabled and the active store will be switched over to local store
-- (void)checkiCloudStatus;
+// Immediately delete local store. Useful for testing
+- (void)hardResetLocalStorage;
 
 // Array of all files and directorys in the ubiquity store. Useful for testing
 - (NSArray *)fileList;
-
-// File URL for the currently selected store
-- (NSURL *)currentStoreURL;
 
 @end
