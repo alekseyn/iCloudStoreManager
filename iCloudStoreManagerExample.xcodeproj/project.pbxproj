@@ -30,6 +30,7 @@
 		5B4B127215227DFE00153613 /* Event.m in Sources */ = {isa = PBXBuildFile; fileRef = 5B4B127115227DFE00153613 /* Event.m */; };
 		5BBC288616CAF055004465F1 /* Default-568h@2x.png in Resources */ = {isa = PBXBuildFile; fileRef = 5BBC288516CAF055004465F1 /* Default-568h@2x.png */; };
 		5BBC288916CAF453004465F1 /* UbiquityStoreManager+Alerts.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BBC288816CAF453004465F1 /* UbiquityStoreManager+Alerts.m */; };
+		5BBDC3A716D20C3E00B5C43C /* MCPersistentStoreMigrator.m in Sources */ = {isa = PBXBuildFile; fileRef = 5BBDC3A616D20C3E00B5C43C /* MCPersistentStoreMigrator.m */; };
 		DA79AA3D1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = DA79AA3B1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld */; };
 		DA79AA411558613F00BAA07A /* UbiquityStoreManager.m in Sources */ = {isa = PBXBuildFile; fileRef = DA79AA401558613F00BAA07A /* UbiquityStoreManager.m */; };
 /* End PBXBuildFile section */
@@ -76,6 +77,8 @@
 		5BBC288516CAF055004465F1 /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "Default-568h@2x.png"; sourceTree = "<group>"; };
 		5BBC288716CAF453004465F1 /* UbiquityStoreManager+Alerts.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "UbiquityStoreManager+Alerts.h"; sourceTree = "<group>"; };
 		5BBC288816CAF453004465F1 /* UbiquityStoreManager+Alerts.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "UbiquityStoreManager+Alerts.m"; sourceTree = "<group>"; };
+		5BBDC3A516D20C3E00B5C43C /* MCPersistentStoreMigrator.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MCPersistentStoreMigrator.h; sourceTree = "<group>"; };
+		5BBDC3A616D20C3E00B5C43C /* MCPersistentStoreMigrator.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = MCPersistentStoreMigrator.m; sourceTree = "<group>"; };
 		DA79AA3115585EBE00BAA07A /* iCloudStoreManagerExample-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "iCloudStoreManagerExample-Info.plist"; sourceTree = "<group>"; };
 		DA79AA3215585EBE00BAA07A /* iCloudStoreManagerExample-Prefix.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "iCloudStoreManagerExample-Prefix.pch"; sourceTree = "<group>"; };
 		DA79AA3C1558608500BAA07A /* iCloudStoreManager.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = iCloudStoreManager.xcdatamodel; sourceTree = "<group>"; };
@@ -113,6 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				5BBC288516CAF055004465F1 /* Default-568h@2x.png */,
+				5BBDC3A416D20C3E00B5C43C /* ThirdParty */,
 				DA79AA3E1558613F00BAA07A /* iCloudStoreManager */,
 				5B4B122E15227C6D00153613 /* iCloudStoreManagerExample */,
 				5B4B125C15227C6E00153613 /* iCloudStoreManagerTests */,
@@ -194,6 +198,15 @@
 				5B4B125F15227C6E00153613 /* InfoPlist.strings */,
 			);
 			name = "Supporting Files";
+			sourceTree = "<group>";
+		};
+		5BBDC3A416D20C3E00B5C43C /* ThirdParty */ = {
+			isa = PBXGroup;
+			children = (
+				5BBDC3A516D20C3E00B5C43C /* MCPersistentStoreMigrator.h */,
+				5BBDC3A616D20C3E00B5C43C /* MCPersistentStoreMigrator.m */,
+			);
+			path = ThirdParty;
 			sourceTree = "<group>";
 		};
 		DA79AA3E1558613F00BAA07A /* iCloudStoreManager */ = {
@@ -327,6 +340,7 @@
 				DA79AA3D1558608500BAA07A /* iCloudStoreManagerExample.xcdatamodeld in Sources */,
 				DA79AA411558613F00BAA07A /* UbiquityStoreManager.m in Sources */,
 				5BBC288916CAF453004465F1 /* UbiquityStoreManager+Alerts.m in Sources */,
+				5BBDC3A716D20C3E00B5C43C /* MCPersistentStoreMigrator.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -480,7 +494,7 @@
 				INFOPLIST_FILE = "iCloudStoreManagerExample/iCloudStoreManagerExample-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "466222DD-0EDA-40B2-BABA-138AB8522A86";
+				"PROVISIONING_PROFILE[sdk=iphoneos*]" = "355BF34F-087B-413D-8CE0-1A5C0865656C";
 				WRAPPER_EXTENSION = app;
 			};
 			name = Release;

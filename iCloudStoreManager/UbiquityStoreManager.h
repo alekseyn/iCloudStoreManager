@@ -36,7 +36,8 @@ typedef enum {
 
 typedef enum {
 	UbiquityStoreManagerDataMigrationNone,
-	UbiquityStoreManagerDataMigrationAutomatic,
+	UbiquityStoreManagerDataMigrationByStore,
+	UbiquityStoreManagerDataMigrationByModel,
 	UbiquityStoreManagerDataMigrationManual
 } UbiquityStoreManagerDataMigrationType;
 
