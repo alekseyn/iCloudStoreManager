@@ -81,8 +81,12 @@ NSString *const CloudLogsDirectory                   = @"Data";
     return self;
 }
 
+- (id)initWithManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)localStoreURL
+ containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions {
+	return [self initStoreNamed:nil withManagedObjectModel:model localStoreURL:localStoreURL containerIdentifier:containerIdentifier additionalStoreOptions:additionalStoreOptions];
+}
+
 - (void)dealloc {
-	
     [self clearStore];
 }
 
