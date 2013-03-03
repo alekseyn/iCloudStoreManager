@@ -119,9 +119,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 - (NSURL *)URLForCloudStore {
 
     // Our cloud store is in the cloud store databases directory and is identified by the active storeUUID.
-    NSString *uuid = self.storeUUID;
-    NSAssert(uuid, @"No storeUUID set.");
-    return [[[self URLForCloudStoreDirectory] URLByAppendingPathComponent:uuid isDirectory:NO] URLByAppendingPathExtension:@"sqlite"];
+    return [[[self URLForCloudStoreDirectory] URLByAppendingPathComponent:self.storeUUID isDirectory:NO] URLByAppendingPathExtension:@"sqlite"];
 }
 
 - (NSURL *)URLForCloudContentDirectory {
@@ -133,9 +131,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 - (NSURL *)URLForCloudContent {
 
     // Our cloud store's logs are in the cloud store transaction logs directory and is identified by the active storeUUID.
-    NSString *uuid = self.storeUUID;
-    NSAssert(uuid, @"No storeUUID set.");
-    return [[self URLForCloudContentDirectory] URLByAppendingPathComponent:uuid isDirectory:YES];
+    return [[self URLForCloudContentDirectory] URLByAppendingPathComponent:self.storeUUID isDirectory:YES];
 }
 
 - (NSURL *)URLForLocalStoreDirectory {
@@ -315,6 +311,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             }
         }
         @finally {
+            [self resetTentativeStoreUUID];
             [self.persistentStoreCoordinator unlock];
             self.loadingStore = NO;
         }
@@ -330,8 +327,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
 - (BOOL)cloudSafeForSeeding {
 
-    if (!self.tentativeStoreUUID)
-        // Migration is only safe when the storeUUID is tentative.
+    if ([[NSUbiquitousKeyValueStore defaultStore] objectForKey:StoreUUIDKey])
+        // Migration is only safe when there is no storeUUID yet (the store is not in the cloud yet).
         return NO;
 
     if ([[NSFileManager defaultManager] fileExistsAtPath:[self URLForCloudStore].path])
@@ -367,75 +364,49 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 #endif
 }
 
-- (void)nukeCloudContainer {
+- (void)nuke:(NSURL *)directoryURL {
 
-    NSURL *cloudContainerURL = [self URLForCloudContainer];
-    if (cloudContainerURL && [[NSFileManager defaultManager] fileExistsAtPath:cloudContainerURL.path]) {
-        [self.persistentStoreCoordinator lock];
-        [self clearStore];
-
-        // Delete the contents of the cloud container.
-        NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
-        for (NSString     *subPath in [[NSFileManager defaultManager] subpathsAtPath:cloudContainerURL.path]) {
-            NSError *error = nil;
-            [coordinator coordinateWritingItemAtURL:[NSURL fileURLWithPath:subPath] options:NSFileCoordinatorWritingForDeleting
-                                              error:&error byAccessor:
-             ^(NSURL *newURL) {
-                 NSError *error_ = nil;
-                 if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
-                     [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
-             }];
-
-            if (error)
-                [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:subPath];
-        }
-
-        // Unset the storeUUID so a new one will be created.
-        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-        [cloud removeObjectForKey:StoreUUIDKey];
-        [cloud synchronize];
-
-        [self.persistentStoreCoordinator unlock];
-        [self loadStore];
-    }
+    NSError *error = nil;
+    [[[NSFileCoordinator alloc] initWithFilePresenter:nil] coordinateWritingItemAtURL:directoryURL
+                                                                              options:NSFileCoordinatorWritingForDeleting
+                                                                                error:&error byAccessor:
+     ^(NSURL *newURL) {
+         NSError *error_ = nil;
+         if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
+             [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
+     }];
+    if (error)
+        [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:directoryURL.path];
 }
 
-- (void)deleteLocalStore {
+- (void)nukeCloudStores {
 
+    [self.persistentStoreCoordinator lock];
     [self clearStore];
-    NSError *error = nil;
-    NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
     
-    [coordinator coordinateWritingItemAtURL:[self URLForLocalStore] options:NSFileCoordinatorWritingForDeleting
-                                      error:&error byAccessor:^(NSURL *newURL) {
-        NSError *error_ = nil;
-        if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
-            [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
-    }];
-    
-    if (error)
-        [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:[self URLForLocalStore].path];
+    // Clean up any cloud stores and transaction logs.
+    [self nuke:[self URLForCloudStoreDirectory]];
+    [self nuke:[self URLForCloudContentDirectory]];
 
+    // Unset the storeUUID so a new one will be created.
+    [self resetTentativeStoreUUID];
+    NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+    [cloud removeObjectForKey:StoreUUIDKey];
+    [cloud synchronize];
+    
+    [self.persistentStoreCoordinator unlock];
     [self loadStore];
 }
 
-- (void)deleteCloudStore {
+- (void)nukeLocalStores {
 
+    [self.persistentStoreCoordinator lock];
     [self clearStore];
-    NSError *error = nil;
-    NSFileCoordinator *coordinator = [[NSFileCoordinator alloc] initWithFilePresenter:nil];
 
-    NSURL *cloudStoreURL = [self URLForCloudStore];
-    [coordinator coordinateWritingItemAtURL:cloudStoreURL options:NSFileCoordinatorWritingForDeleting
-                                      error:&error byAccessor:^(NSURL *newURL) {
-        NSError *error_ = nil;
-        if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
-            [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:cloudStoreURL.path];
-    }];
-    
-    if (error)
-        [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:cloudStoreURL.path];
+    // Remove just the local store.
+    [self nuke:[self URLForLocalStoreDirectory]];
 
+    [self.persistentStoreCoordinator unlock];
     [self loadStore];
 }
 
@@ -494,13 +465,22 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
  * When a tentativeStoreUUID is set, this operation confirms it and writes it as the new storeUUID to the iCloud KVS.
  */
 - (void)confirmTentativeStoreUUID {
-
+    
     if (self.tentativeStoreUUID) {
         NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
         [cloud setObject:self.tentativeStoreUUID forKey:StoreUUIDKey];
         [cloud synchronize];
-        self.tentativeStoreUUID = nil;
+        
+        [self resetTentativeStoreUUID];
     }
+}
+
+/**
+ * When a tentativeStoreUUID is set, this operation resets it so that a new one will be generated if necessary.
+ */
+- (void)resetTentativeStoreUUID {
+    
+    self.tentativeStoreUUID = nil;
 }
 
 #pragma mark - NSFilePresenter
@@ -530,14 +510,12 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
 - (void)applicationDidBecomeActive:(NSNotification *)note {
 
-    // Check for account changes.
+    // Check for iCloud account changes.
     NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
     id lastIdentityToken    = [local objectForKey:CloudIdentityKey];
     id currentIdentityToken = [[NSFileManager defaultManager] ubiquityIdentityToken];
-    if (![lastIdentityToken isEqual:currentIdentityToken]) {
+    if (![lastIdentityToken isEqual:currentIdentityToken])
         [self cloudStoreChanged:nil];
-        return;
-    }
 }
 
 - (void)keyValueStoreChanged:(NSNotification *)note {
@@ -546,6 +524,12 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
         [self cloudStoreChanged:nil];
 }
 
+/**
+ * Triggered when:
+ * 1. Ubiquity identity changed (eg. iCloud account changed in settings)
+ * 2. Store file was deleted (eg. iCloud container deleted in settings)
+ * 3. StoreUUID changed (eg. switched to a new cloud store on another device)
+ */
 - (void)cloudStoreChanged:(NSNotification *)note {
 
     // Update the identity token in case it changed.
@@ -554,6 +538,10 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     [local setObject:identityToken forKey:CloudIdentityKey];
     [local synchronize];
 
+    // Don't reload the store when the local one is active.
+    if (!self.cloudEnabled)
+        return;
+    
     // Reload the store.
     [self log:@"Cloud store changed.  StoreUUID: %@, Identity: %@", self.storeUUID, identityToken];
     [self loadStore];
@@ -563,9 +551,19 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
     [self log:@"Cloud store updates:\n%@", note.userInfo];
     [self.persistentStorageQueue addOperationWithBlock:^{
-        NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityStoreManager:self];
+        NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityChangesInManager:self];
         [moc performBlockAndWait:^{
             [moc mergeChangesFromContextDidSaveNotification:note];
+            
+            NSError *error = nil;
+            if (![moc save:&error]) {
+                [self error:error cause:UbiquityStoreManagerErrorCauseImportChanges context:note];
+
+                NSArray *detailedErrors = [[error userInfo] objectForKey:NSDetailedErrorsKey];
+                if ([detailedErrors count])
+                    for (NSError *detailedError in detailedErrors)
+                        [self error:detailedError cause:UbiquityStoreManagerErrorCauseImportChanges context:nil];
+            }
         }];
 
         dispatch_async(dispatch_get_main_queue(), ^{

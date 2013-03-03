@@ -31,19 +31,27 @@ typedef enum {
     UbiquityStoreManagerErrorCauseOpenLocalStore, // Error occurred while opening the local store file.
     UbiquityStoreManagerErrorCauseOpenCloudStore, // Error occurred while opening the cloud store file.
     UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore, // Error occurred while migrating the local store to the cloud.
+    UbiquityStoreManagerErrorCauseImportChanges // Error occurred while importing changes from the cloud into the application's context.
 }               UbiquityStoreManagerErrorCause;
 
 @class UbiquityStoreManager;
 
 @protocol UbiquityStoreManagerDelegate<NSObject>
 
+/** The application should provide a managed object context to use for importing cloud changes.
+ *
+ * After importing the changes to the context, the context will be saved.
+ */
 @required
-- (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm;
+- (NSManagedObjectContext *)managedObjectContextForUbiquityChangesInManager:(UbiquityStoreManager *)usm;
 
 @optional
+/** Triggered when the store manager loads a persistence store.  Mainly useful to be informed of whether or not cloud is enabled. */
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToCloud:(BOOL)cloudEnabled;
+/** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions in whatever way you see fit. */
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error
                        cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
+/** Triggered whenever the store manager has information to share about its operation.  Mainly useful to plug in your own logger. */
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
 
 @end
