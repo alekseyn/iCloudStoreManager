@@ -36,16 +36,11 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
 	// STEP 1 - Initialize the UbiquityStoreManager
-	ubiquityStoreManager = [[UbiquityStoreManager alloc] initWithManagedObjectModel: [self managedObjectModel] 
-																	  localStoreURL: [self storeURL] 
-																containerIdentifier: nil 
-															 additionalStoreOptions: nil];
+	ubiquityStoreManager = [[UbiquityStoreManager alloc] initStoreNamed:nil withManagedObjectModel:[self managedObjectModel]
+                                                          localStoreURL:[self storeURL] containerIdentifier:nil additionalStoreOptions:nil];
 	// STEP 2a  - Setup the delegate
 	ubiquityStoreManager.delegate = self;
 	
-	// For test purposes only. NOT FOR USE IN PRODUCTION
-	ubiquityStoreManager.hardResetEnabled = YES;
-
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     // Override point for customization after application launch.
 	if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
@@ -86,8 +81,6 @@
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
-	// STEP 2b - Check to make sure user has not deleted the iCloud data from Settings
-	[self.ubiquityStoreManager checkiCloudStatus];
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
