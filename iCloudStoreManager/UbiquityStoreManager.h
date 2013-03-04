@@ -53,21 +53,27 @@ typedef enum {
 @required
 - (NSManagedObjectContext *)managedObjectContextForUbiquityChangesInManager:(UbiquityStoreManager *)manager;
 
-/** Triggered when the store manager loads a persistence store.
- *
- * This is where you'll init/update your application's persistence layer.
- */
-@required
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore;
-
 /** Triggered when the store manager begins loading a persistence store.
  *
- * Between this and an invocation of -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: or -ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:, the application should not be using the persistence coordinator.  Ideally, you could unset your managed object contexts here.
+ * Between this and an invocation of -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: or -ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:, the application should not be using the persistence coordinator.
+ * You should probably unset your managed object contexts here to prevent exceptions/hangs in your applications (the coordinator is locked and its store removed).
  * Also useful for indicating in your user interface that the store is loading.
  */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager willLoadStoreIsCloud:(BOOL)isCloudStore;
-/** Triggered when the store manager fails to loads a persistence store.  Useful to decide what to do to make a store available to the application. If you don't implement this, the default behaviour is to disable cloud when loading the cloud store fails and do nothing when loading the local store fails. */
+/** Triggered when the store manager loads a persistence store.
+ *
+ * This is where you'll init/update your application's persistence layer.
+ * You should probably create your main managed object context here.  Note the coordinator could change during the application's lifetime.
+ */
+@required
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore;
+/** Triggered when the store manager fails to loads a persistence store.
+ *
+ * Useful to decide what to do to make a store available to the application.
+ * You should probably unset your managed object contexts here to prevent exceptions in your applications (the coordinator has no more store).
+ * If you don't implement this, the default behaviour is to disable cloud when loading the cloud store fails and do nothing when loading the local store fails.  You can implement this simply with `manager.cloudEnabled = NO;`.
+ */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreManagerErrorCause)cause wasCloud:(BOOL)wasCloudStore;
 /** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions in whatever way you see fit. */

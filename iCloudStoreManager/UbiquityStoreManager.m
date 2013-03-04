@@ -800,8 +800,10 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             }
         }];
 
-        [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidImportChangesNotification object:self
-                                                          userInfo:[note userInfo]];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidImportChangesNotification object:self
+                                                              userInfo:[note userInfo]];
+        });
     }];
 }
 
