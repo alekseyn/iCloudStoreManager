@@ -34,7 +34,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 @property (nonatomic, readonly) NSString           *storeUUID;
 @property (nonatomic, strong) NSString             *tentativeStoreUUID;
 @property (nonatomic, strong) NSOperationQueue     *persistentStorageQueue;
-@property (nonatomic) BOOL loadingStore;
+@property (nonatomic, strong) NSPersistentStoreCoordinator *persistentStoreCoordinator;
 
 @end
 
@@ -42,20 +42,16 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 @implementation UbiquityStoreManager {
     NSOperationQueue *_presentedItemOperationQueue;
 }
-@synthesize persistentStoreCoordinator = _persistentStoreCoordinator;
-
-- (id)init {
-
-    return self = [self initStoreNamed:nil withManagedObjectModel:nil localStoreURL:nil containerIdentifier:nil additionalStoreOptions:nil];
-}
 
 - (id)initStoreNamed:(NSString *)contentName withManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)localStoreURL
- containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions {
+ containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions
+            delegate:(id <UbiquityStoreManagerDelegate>)delegate {
 
     if (!(self = [super init]))
         return nil;
 
     // Parameters
+    _delegate               = delegate;
     _contentName            = contentName == nil? @"UbiquityStore": contentName;
     _model                  = model == nil? [NSManagedObjectModel mergedModelFromBundles:nil]: model;
     if (!localStoreURL)
@@ -69,15 +65,20 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     // Private vars
     _persistentStorageQueue = [NSOperationQueue new];
     _persistentStorageQueue.name = [NSString stringWithFormat:@"%@PersistenceQueue", NSStringFromClass([self class])];
+    _persistentStorageQueue.maxConcurrentOperationCount = 1;
     _presentedItemOperationQueue = [NSOperationQueue new];
     _presentedItemOperationQueue.name = [NSString stringWithFormat:@"%@PresenterQueue", NSStringFromClass([self class])];
 
+    [self loadStore];
+    
     return self;
 }
 
 - (void)dealloc {
 
+    [self.persistentStoreCoordinator tryLock];
     [self clearStore];
+    [self.persistentStoreCoordinator unlock];
 }
 
 #pragma mark - File Handling
@@ -177,153 +178,363 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 
     // Remove the store from the coordinator.
-    NSPersistentStoreCoordinator *psc = self.persistentStoreCoordinator;
-    BOOL pscLockedByUs = [psc tryLock];
     NSError *error = nil;
-    BOOL failed = NO;
-
-    for (NSPersistentStore *store in psc.persistentStores)
-        if (![psc removePersistentStore:store error:&error]) {
-            failed = YES;
+    for (NSPersistentStore *store in self.persistentStoreCoordinator.persistentStores)
+        if (![self.persistentStoreCoordinator removePersistentStore:store error:&error])
             [self error:error cause:UbiquityStoreManagerErrorCauseClearStore context:store];
-        }
 
-    if (pscLockedByUs)
-        [psc unlock];
-    if (failed)
-     // Try to recover by throwing out the PSC.
-        _persistentStoreCoordinator = nil;
+    if ([self.persistentStoreCoordinator.persistentStores count]) {
+        // We couldn't remove all the stores, make a new PSC instead.
+        [self.persistentStoreCoordinator unlock];
+        self.persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
+        [self.persistentStoreCoordinator lock];
+    }
 }
 
 - (void)loadStore {
 
-    @synchronized (self) {
-        if (self.loadingStore)
-            return;
-        self.loadingStore = YES;
-    }
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:willLoadStoreIsCloud:)])
+        [self.delegate ubiquityStoreManager:self willLoadStoreIsCloud:self.cloudEnabled];
 
-    if (!self.cloudEnabled) {
-        @try {
-            // Load local store if iCloud is disabled.
-            NSError             *error             = nil;
-            NSMutableDictionary *localStoreOptions = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                                           @YES, NSMigratePersistentStoresAutomaticallyOption,
-                                                                           @YES, NSInferMappingModelAutomaticallyOption,
-                                                                           nil];
-            [localStoreOptions addEntriesFromDictionary:self.additionalStoreOptions];
+    if (!self.persistentStoreCoordinator)
+        self.persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
 
-            // Make sure local store directory exists.
-            if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForLocalStoreDirectory].path
-                                           withIntermediateDirectories:YES attributes:nil error:&error])
-                [self error:error cause:UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudStoreDirectory].path];
+    if (self.cloudEnabled)
+        [self loadCloudStore];
+    else
+        [self loadLocalStore];
+}
 
-            // Add local store to PSC.
-            [self.persistentStoreCoordinator lock];
-            [self clearStore];
-            if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                                               configuration:nil URL:[self URLForLocalStore]
-                                                                     options:localStoreOptions
-                                                                       error:&error])
-                [self error:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:[self URLForLocalStore]];
-            [self observeStore];
-        }
-        @finally {
-            [self.persistentStoreCoordinator unlock];
-            self.loadingStore = NO;
-        }
+- (void)loadCloudStore {
 
-        [self log:@"iCloud disabled. %@",  [self.persistentStoreCoordinator.persistentStores count]? @"Loaded local store.": @"Failed to load local store."];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
-            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
-                [self.delegate ubiquityStoreManager:self didSwitchToCloud:NO];
-        });
-
-        return;
-    }
-
-    // Otherwise, load iCloud store asynchronously (init of iCloud may take some time).
+    // Load iCloud store asynchronously (init of iCloud may take some time).
     [self.persistentStorageQueue addOperationWithBlock:^{
+        if (![self.persistentStoreCoordinator tryLock])
+            // PSC is locked and busy with another operation.  We can't use it.
+            return;
+
+        NSError *error = nil;
+        UbiquityStoreManagerErrorCause cause;
         @try {
+            [self clearStore];
+
+            // Check if the user is logged into iCloud on the device.
             if (![self URLForCloudContainer]) {
-                // iCloud is not enabled on this device.  Disable iCloud in the app (will cause a re-load using the local store).
-                // TODO: Notify user?
-                self.loadingStore = NO;
-                self.cloudEnabled = NO;
+                cause = UbiquityStoreManagerErrorCauseNoAccount;
                 return;
             }
 
             // Create the path to the cloud store.
-            NSError *error = nil;
             if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForCloudStoreDirectory].path
                                            withIntermediateDirectories:YES attributes:nil error:&error])
-                [self error:error cause:UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudStoreDirectory].path];
+                [self error:error cause:cause = UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudStoreDirectory].path];
 
             // Add cloud store to PSC.
-            NSURL               *cloudStoreURL         = [self URLForCloudStore];
-            NSMutableDictionary *cloudStoreOptions     = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                                               self.contentName, NSPersistentStoreUbiquitousContentNameKey,
-                                                                               [self URLForCloudContent], NSPersistentStoreUbiquitousContentURLKey,
-                                                                               @YES, NSMigratePersistentStoresAutomaticallyOption,
-                                                                               @YES, NSInferMappingModelAutomaticallyOption,
-                                                                               nil];
-            NSMutableDictionary *migratingStoreOptions = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                                                                               @YES, NSReadOnlyPersistentStoreOption,
-                                                                               nil];
+            NSURL *cloudStoreURL = [self URLForCloudStore];
+            NSMutableDictionary *cloudStoreOptions = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                    self.contentName, NSPersistentStoreUbiquitousContentNameKey,
+                    [self URLForCloudContent], NSPersistentStoreUbiquitousContentURLKey,
+                    @YES, NSMigratePersistentStoresAutomaticallyOption,
+                    @YES, NSInferMappingModelAutomaticallyOption,
+                    nil];
+            NSMutableDictionary *localStoreOptions = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                    @YES, NSReadOnlyPersistentStoreOption,
+                    nil];
             [cloudStoreOptions addEntriesFromDictionary:self.additionalStoreOptions];
-            [migratingStoreOptions addEntriesFromDictionary:self.additionalStoreOptions];
+            [localStoreOptions addEntriesFromDictionary:self.additionalStoreOptions];
 
-            [self.persistentStoreCoordinator lock];
-            [self clearStore];
+            // Now load the cloud store.  If possible, first migrate the local store to it.
+            NSURL *localStoreURL = [self URLForLocalStore];
+            UbiquityStoreManagerMigrationStrategy migrationStrategy = self.migrationStrategy;
+            if (![self cloudSafeForSeeding] || ![[NSFileManager defaultManager] fileExistsAtPath:localStoreURL.path])
+                migrationStrategy = UbiquityStoreManagerMigrationStrategyNone;
 
-            // Determine whether we can seed the cloud store from the local store.
-            if ([self cloudSafeForSeeding] && [[NSFileManager defaultManager] fileExistsAtPath:[self URLForLocalStore].path]) {
-                // First add the local store, then migrate it to the cloud store.
-                [self log:@"Migrating local store to new cloud store."];
+            switch (migrationStrategy) {
+                case UbiquityStoreManagerMigrationStrategyCopyEntities: {
+                    [self log:@"Migrating local store to new cloud store using strategy: UbiquityStoreManagerMigrationStrategyCopyEntities"];
 
-                // Add the store to migrate
-                NSPersistentStore *migratingStore = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                                                                                  configuration:nil URL:[self URLForLocalStore]
-                                                                                                        options:migratingStoreOptions
+                    // Open local and cloud store.
+                    NSPersistentStoreCoordinator *localCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
+                    NSPersistentStore *localStore = [localCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                                                   configuration:nil URL:localStoreURL
+                                                                                         options:localStoreOptions
+                                                                                           error:&error];
+                    if (!localStore) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL.path];
+                        break;
+                    }
+
+                    NSPersistentStoreCoordinator *cloudCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
+                    NSPersistentStore *cloudStore = [cloudCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                                                   configuration:nil URL:cloudStoreURL
+                                                                                         options:cloudStoreOptions
+                                                                                           error:&error];
+                    if (!cloudStore) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
+                        break;
+                    }
+
+                    // Set up contexts for them.
+                    NSManagedObjectContext *localContext = [NSManagedObjectContext new];
+                    NSManagedObjectContext *cloudContext = [NSManagedObjectContext new];
+                    localContext.persistentStoreCoordinator = localCoordinator;
+                    cloudContext.persistentStoreCoordinator = cloudCoordinator;
+
+                    // Copy metadata.
+                    NSMutableDictionary *metadata = [[localCoordinator metadataForPersistentStore:localStore] mutableCopy];
+                    [metadata addEntriesFromDictionary:[cloudCoordinator metadataForPersistentStore:cloudStore]];
+                    [cloudCoordinator setMetadata:metadata forPersistentStore:cloudStore];
+
+                    // Migrate entities.
+                    BOOL migrationFailure = NO;
+                    NSMutableDictionary *migratedIDsBySourceID = [[NSMutableDictionary alloc] initWithCapacity:500];
+                    for (NSEntityDescription *entity in self.model.entities) {
+                        NSFetchRequest *fetch = [NSFetchRequest new];
+                        fetch.entity = entity;
+                        fetch.fetchBatchSize = 500;
+                        fetch.relationshipKeyPathsForPrefetching = entity.relationshipsByName.allKeys;
+
+                        NSArray *localObjects = [localContext executeFetchRequest:fetch error:&error];
+                        if (!localObjects) {
+                            migrationFailure = YES;
+                            break;
+                        }
+
+                        for (NSManagedObject *localObject in localObjects)
+                            [self copyMigrateObject:localObject toContext:cloudContext usingMigrationCache:migratedIDsBySourceID];
+                    }
+
+                    // Handle failure by cleaning up the cloud store.
+                    if (migrationFailure) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
+
+                        if (![cloudCoordinator removePersistentStore:cloudStore error:&error])
+                            [self error:error cause:cause = UbiquityStoreManagerErrorCauseClearStore context:cloudStoreURL.path];
+                        [self removeItemAtURL:cloudStoreURL];
+                        break;
+                    }
+
+                    // Add the store now that migration is finished.
+                    if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                                       configuration:nil URL:cloudStoreURL
+                                                                             options:cloudStoreOptions
+                                                                               error:&error]) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
+                    }
+
+                    break;
+                }
+
+                case UbiquityStoreManagerMigrationStrategyIOS: {
+                    [self log:@"Migrating local store to new cloud store using strategy: UbiquityStoreManagerMigrationStrategyIOS"];
+
+                    // Add the store to migrate.
+                    NSPersistentStore *localStore = [self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                                                                  configuration:nil URL:localStoreURL
+                                                                                                        options:localStoreOptions
                                                                                                           error:&error];
 
-                if (!migratingStore)
-                    [self error:error cause:UbiquityStoreManagerErrorCauseOpenLocalStore context:[self URLForLocalStore]];
+                    if (!localStore) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenLocalStore context:localStoreURL];
+                        break;
+                    }
 
-                else if (![self.persistentStoreCoordinator migratePersistentStore:migratingStore
-                                                                            toURL:cloudStoreURL
-                                                                          options:cloudStoreOptions
-                                                                         withType:NSSQLiteStoreType
-                                                                            error:&error])
-                    [self error:error cause:UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
-            }
-             // Not seeding, just add the cloud store.
-            else if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
-                                                                    configuration:nil URL:cloudStoreURL
-                                                                          options:cloudStoreOptions
-                                                                            error:&error])
-                [self error:error cause:UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
+                    if (![self.persistentStoreCoordinator migratePersistentStore:localStore
+                                                                           toURL:cloudStoreURL
+                                                                         options:cloudStoreOptions
+                                                                        withType:NSSQLiteStoreType
+                                                                           error:&error]) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
 
-            if ([self.persistentStoreCoordinator.persistentStores count]) {
-                [self confirmTentativeStoreUUID];
-                [self observeStore];
+                        if (![self.persistentStoreCoordinator removePersistentStore:localStore error:&error])
+                            [self error:error cause:cause = UbiquityStoreManagerErrorCauseClearStore context:cloudStoreURL.path];
+                    }
+                    break;
+                }
+
+                case UbiquityStoreManagerMigrationStrategyManual: {
+                    [self log:@"Migrating local store to new cloud store using strategy: UbiquityStoreManagerMigrationStrategyManual"];
+
+                    if (![self.delegate ubiquityStoreManager:self
+                                        manuallyMigrateStore:localStoreURL withOptions:localStoreOptions
+                                                     toStore:cloudStoreURL withOptions:cloudStoreOptions error:&error]) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
+                        [self removeItemAtURL:cloudStoreURL];
+                        break;
+                    }
+
+                    // Add the store now that migration is finished.
+                    if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                                       configuration:nil URL:cloudStoreURL
+                                                                             options:cloudStoreOptions
+                                                                               error:&error]) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
+                    }
+
+                    break;
+                }
+
+                case UbiquityStoreManagerMigrationStrategyNone: {
+                    [self log:@"Loading cloud store without local store migration."];
+
+                    // Just add the store without first migrating to it.
+                    if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                                       configuration:nil URL:cloudStoreURL
+                                                                             options:cloudStoreOptions
+                                                                               error:&error]) {
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
+                    }
+                    break;
+                }
             }
+        }
+        @catch (id exception) {
+            NSMutableDictionary *userInfo = [NSMutableDictionary dictionaryWithCapacity:2];
+            if (exception)
+                [userInfo setObject:[exception description] forKey:NSLocalizedFailureReasonErrorKey];
+            if (error)
+                [userInfo setObject:error forKey:NSUnderlyingErrorKey];
+            [self error:[NSError errorWithDomain:NSCocoaErrorDomain code:0 userInfo:userInfo]
+                  cause:UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:exception];
+            
+            // Clean up any local stores that may still be present.
+            for (NSPersistentStore *store in self.persistentStoreCoordinator.persistentStores)
+                if (![self.persistentStoreCoordinator removePersistentStore:store error:&error])
+                    [self error:error cause:UbiquityStoreManagerErrorCauseClearStore context:store];
         }
         @finally {
-            [self resetTentativeStoreUUID];
-            [self.persistentStoreCoordinator unlock];
-            self.loadingStore = NO;
-        }
+            BOOL cloudWasEnabled = [self.persistentStoreCoordinator.persistentStores count] > 0;
+            if (cloudWasEnabled) {
+                [self confirmTentativeStoreUUID];
+                [self log:@"iCloud enabled (UUID:%@) and successfully loaded cloud store.", self.storeUUID];
+                [self observeStore];
+            }
+            else {
+                [self resetTentativeStoreUUID];
 
-        [self log:@"iCloud enabled. %@",  [self.persistentStoreCoordinator.persistentStores count]? @"Loaded cloud store.": @"Failed to load cloud store."];
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
-            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didSwitchToCloud:)])
-                [self.delegate ubiquityStoreManager:self didSwitchToCloud:YES];
-        });
+                if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:)]) {
+                    [self log:@"iCloud enabled but failed to load cloud store (cause:%u). Application will handle failure.", cause];
+                } else {
+                    [self log:@"iCloud enabled but failed to load cloud store (cause:%u). Will fall back to local store.", cause];
+                }
+            }
+            [self.persistentStoreCoordinator unlock];
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                if (cloudWasEnabled) {
+                    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didLoadStoreForCoordinator:isCloud:)])
+                        [self.delegate ubiquityStoreManager:self didLoadStoreForCoordinator:self.persistentStoreCoordinator isCloud:YES];
+                    [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
+                } else if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:)])
+                    [self.delegate ubiquityStoreManager:self failedLoadingStoreWithCause:cause wasCloud:YES];
+                else
+                    self.cloudEnabled = NO;
+            });
+
+        }
     }];
 }
+
+- (void)loadLocalStore {
+
+    if (![self.persistentStoreCoordinator tryLock])
+        // PSC is locked and busy with another operation.  We can't use it.
+        return;
+
+    UbiquityStoreManagerErrorCause cause;
+    @try {
+        [self clearStore];
+
+        // Load local store if iCloud is disabled.
+        NSError *error = nil;
+        NSMutableDictionary *localStoreOptions = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                @YES, NSMigratePersistentStoresAutomaticallyOption,
+                @YES, NSInferMappingModelAutomaticallyOption,
+                nil];
+        [localStoreOptions addEntriesFromDictionary:self.additionalStoreOptions];
+
+        // Make sure local store directory exists.
+        if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForLocalStoreDirectory].path
+                                       withIntermediateDirectories:YES attributes:nil error:&error]) {
+            [self error:error cause:cause = UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudStoreDirectory].path];
+            return;
+        }
+
+        // Add local store to PSC.
+        if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
+                                                           configuration:nil URL:[self URLForLocalStore]
+                                                                 options:localStoreOptions
+                                                                   error:&error]) {
+            [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenLocalStore context:[self URLForLocalStore]];
+            return;
+        }
+    }
+    @finally {
+        BOOL localWasEnabled = [self.persistentStoreCoordinator.persistentStores count] > 0;
+        if (localWasEnabled) {
+            [self log:@"iCloud disabled and successfully loaded local store."];
+            [self observeStore];
+        }
+        else {
+            if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:)]) {
+                [self log:@"iCloud disabled but failed to load local store (cause:%u). Application will handle failure.", cause];
+            } else {
+                [self log:@"iCloud disabled but failed to load local store (cause:%u). No store available to application.", cause];
+            }
+        }
+        [self.persistentStoreCoordinator unlock];
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (localWasEnabled) {
+                if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didLoadStoreForCoordinator:isCloud:)])
+                    [self.delegate ubiquityStoreManager:self didLoadStoreForCoordinator:self.persistentStoreCoordinator isCloud:NO];
+                [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
+            } else if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:)])
+                [self.delegate ubiquityStoreManager:self failedLoadingStoreWithCause:cause wasCloud:NO];
+        });
+    }
+}
+
+- (id)copyMigrateObject:(NSManagedObject *)sourceObject toContext:(NSManagedObjectContext *)destinationContext usingMigrationCache:(NSMutableDictionary *)migratedIDsBySourceID {
+
+    if (!sourceObject)
+        return nil;
+
+    NSManagedObjectID *destinationObjectID = [migratedIDsBySourceID objectForKey:sourceObject.objectID];
+    if (destinationObjectID)
+        return [destinationContext objectWithID:destinationObjectID];
+
+    @autoreleasepool {
+        // Create migrated object.
+        NSEntityDescription *entity = sourceObject.entity;
+        NSManagedObject *destinationObject = [NSEntityDescription insertNewObjectForEntityForName:entity.name inManagedObjectContext:destinationContext];
+        [migratedIDsBySourceID setObject:destinationObject.objectID forKey:sourceObject.objectID];
+
+        // Set attributes
+        for (NSString *key in entity.attributesByName.allKeys)
+            [destinationObject setPrimitiveValue:[sourceObject primitiveValueForKey:key] forKey:key];
+
+        // Set relationships recursively
+        for (NSRelationshipDescription *relationDescription in entity.relationshipsByName.allValues) {
+            NSString *key = relationDescription.name;
+            id value = nil;
+
+            if (relationDescription.isToMany) {
+                value = [[destinationObject primitiveValueForKey:key] mutableCopy];
+
+                for (NSManagedObject *element in [sourceObject primitiveValueForKey:key])
+                    [value addObject:[self copyMigrateObject:element toContext:destinationContext usingMigrationCache:migratedIDsBySourceID]];
+            }
+            else
+                value = [self copyMigrateObject:[sourceObject primitiveValueForKey:key] toContext:destinationContext usingMigrationCache:migratedIDsBySourceID];
+
+            [destinationObject setPrimitiveValue:value forKey:key];
+        }
+
+        return destinationObject;
+    }
+}
+
 
 - (BOOL)cloudSafeForSeeding {
 
@@ -364,7 +575,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 #endif
 }
 
-- (void)nuke:(NSURL *)directoryURL {
+- (void)removeItemAtURL:(NSURL *)directoryURL {
 
     NSError *error = nil;
     [[[NSFileCoordinator alloc] initWithFilePresenter:nil] coordinateWritingItemAtURL:directoryURL
@@ -379,15 +590,19 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
         [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:directoryURL.path];
 }
 
-- (void)nukeCloudStores {
-
-    [self.persistentStoreCoordinator lock];
-    [self clearStore];
+- (BOOL)nukeCloudContainer {
     
-    // Clean up any cloud stores and transaction logs.
-    [self nuke:[self URLForCloudStoreDirectory]];
-    [self nuke:[self URLForCloudContentDirectory]];
+    if (![self.persistentStoreCoordinator tryLock]) {
+        [self log:@"Cannot nuke the cloud container: Manager is locked."];
+        return NO;
+    }
+    [self log:@"Will nuke the cloud container."];
 
+    [self clearStore];
+
+    // Delete the whole cloud container.
+    [self removeItemAtURL:[self URLForCloudContainer]];
+    
     // Unset the storeUUID so a new one will be created.
     [self resetTentativeStoreUUID];
     NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
@@ -396,37 +611,56 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     
     [self.persistentStoreCoordinator unlock];
     [self loadStore];
+
+    return YES;
 }
 
-- (void)nukeLocalStores {
+- (BOOL)deleteCloudStore {
 
-    [self.persistentStoreCoordinator lock];
+    if (![self.persistentStoreCoordinator tryLock]) {
+        [self log:@"Cannot delete the cloud store: Manager is locked."];
+        return NO;
+    }
+    [self log:@"Will delete the cloud store (UUID:%@).", self.storeUUID];
+
     [self clearStore];
 
-    // Remove just the local store.
-    [self nuke:[self URLForLocalStoreDirectory]];
+    // Clean up any cloud stores and transaction logs.
+    [self removeItemAtURL:[self URLForCloudStoreDirectory]];
+    [self removeItemAtURL:[self URLForCloudContentDirectory]];
+
+    // Unset the storeUUID so a new one will be created.
+    [self resetTentativeStoreUUID];
+    NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+    [cloud removeObjectForKey:StoreUUIDKey];
+    [cloud synchronize];
 
     [self.persistentStoreCoordinator unlock];
     [self loadStore];
+
+    return YES;
+}
+
+- (BOOL)deleteLocalStore {
+
+    if (![self.persistentStoreCoordinator tryLock]) {
+        [self log:@"Cannot delete the local store: Manager is locked."];
+        return NO;
+    }
+    [self log:@"Will delete the local store."];
+
+    [self clearStore];
+
+    // Remove just the local store.
+    [self removeItemAtURL:[self URLForLocalStoreDirectory]];
+
+    [self.persistentStoreCoordinator unlock];
+    [self loadStore];
+
+    return YES;
 }
 
 #pragma mark - Properties
-
-- (NSPersistentStoreCoordinator *)persistentStoreCoordinator {
-
-    if (!_persistentStoreCoordinator) {
-        _persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
-
-        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(mergeChanges:)
-                                                     name:NSPersistentStoreDidImportUbiquitousContentChangesNotification
-                                                   object:_persistentStoreCoordinator];
-    }
-
-    if (![_persistentStoreCoordinator.persistentStores count])
-        [self loadStore];
-
-    return _persistentStoreCoordinator;
-}
 
 - (BOOL)cloudEnabled {
 
@@ -449,7 +683,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
     NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
     NSString *storeUUID = [cloud objectForKey:StoreUUIDKey];
-    
+
     // If no storeUUID is set yet, create a new storeUUID and return that as long as no storeUUID is set yet.
     // When the migration to the new storeUUID is successful, we update the iCloud's KVS with a call to -setStoreUUID.
     if (!storeUUID) {
@@ -465,12 +699,12 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
  * When a tentativeStoreUUID is set, this operation confirms it and writes it as the new storeUUID to the iCloud KVS.
  */
 - (void)confirmTentativeStoreUUID {
-    
+
     if (self.tentativeStoreUUID) {
         NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
         [cloud setObject:self.tentativeStoreUUID forKey:StoreUUIDKey];
         [cloud synchronize];
-        
+
         [self resetTentativeStoreUUID];
     }
 }
@@ -479,7 +713,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
  * When a tentativeStoreUUID is set, this operation resets it so that a new one will be generated if necessary.
  */
 - (void)resetTentativeStoreUUID {
-    
+
     self.tentativeStoreUUID = nil;
 }
 
@@ -494,7 +728,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 }
 
 -(NSOperationQueue *)presentedItemOperationQueue {
-    
+
     return _presentedItemOperationQueue;
 }
 
@@ -541,7 +775,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     // Don't reload the store when the local one is active.
     if (!self.cloudEnabled)
         return;
-    
+
     // Reload the store.
     [self log:@"Cloud store changed.  StoreUUID: %@, Identity: %@", self.storeUUID, identityToken];
     [self loadStore];
@@ -554,7 +788,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
         NSManagedObjectContext *moc = [self.delegate managedObjectContextForUbiquityChangesInManager:self];
         [moc performBlockAndWait:^{
             [moc mergeChangesFromContextDidSaveNotification:note];
-            
+
             NSError *error = nil;
             if (![moc save:&error]) {
                 [self error:error cause:UbiquityStoreManagerErrorCauseImportChanges context:note];
@@ -566,10 +800,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             }
         }];
 
-        dispatch_async(dispatch_get_main_queue(), ^{
-            [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidImportChangesNotification object:self
-                                                              userInfo:[note userInfo]];
-        });
+        [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidImportChangesNotification object:self
+                                                          userInfo:[note userInfo]];
     }];
 }
 
