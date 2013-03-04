@@ -165,8 +165,13 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
     if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
         [self.delegate ubiquityStoreManager:self didEncounterError:error cause:cause context:context];
-    else
+    else {
         [self log:@"error: %@, cause: %u, context: %@", error, cause, context];
+
+        NSArray *detailedErrors = [[error userInfo] objectForKey:NSDetailedErrorsKey];
+        for (NSError *detailedError in detailedErrors)
+            [self log:@"    - detailed error: %@", detailedError];
+    }
 }
 
 #pragma mark - Store Management
@@ -228,6 +233,9 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForCloudStoreDirectory].path
                                            withIntermediateDirectories:YES attributes:nil error:&error])
                 [self error:error cause:cause = UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudStoreDirectory].path];
+            if (![[NSFileManager defaultManager] createDirectoryAtPath:[self URLForCloudContent].path
+                                           withIntermediateDirectories:YES attributes:nil error:&error])
+                [self error:error cause:cause = UbiquityStoreManagerErrorCauseCreateStorePath context:[self URLForCloudContent].path];
 
             // Add cloud store to PSC.
             NSURL *cloudStoreURL = [self URLForCloudStore];
@@ -270,7 +278,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                                          options:cloudStoreOptions
                                                                                            error:&error];
                     if (!cloudStore) {
-                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
+                        [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
                         break;
                     }
 
@@ -303,6 +311,11 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                         for (NSManagedObject *localObject in localObjects)
                             [self copyMigrateObject:localObject toContext:cloudContext usingMigrationCache:migratedIDsBySourceID];
                     }
+
+                    // Save migrated entities.
+                    if (!migrationFailure)
+                        if (![cloudContext save:&error])
+                            migrationFailure = YES;
 
                     // Handle failure by cleaning up the cloud store.
                     if (migrationFailure) {
@@ -410,6 +423,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 [self observeStore];
             }
             else {
+                // TODO: If this happens, the cloud store on this device is desynced.  We should destroy it either locally or ubiquitously.
                 [self resetTentativeStoreUUID];
 
                 if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:)]) {
@@ -790,14 +804,9 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             [moc mergeChangesFromContextDidSaveNotification:note];
 
             NSError *error = nil;
-            if (![moc save:&error]) {
+            if (![moc save:&error])
+                // TODO: If this happens, the cloud store on this device is desynced.  We should destroy it either locally or ubiquitously.
                 [self error:error cause:UbiquityStoreManagerErrorCauseImportChanges context:note];
-
-                NSArray *detailedErrors = [[error userInfo] objectForKey:NSDetailedErrorsKey];
-                if ([detailedErrors count])
-                    for (NSError *detailedError in detailedErrors)
-                        [self error:detailedError cause:UbiquityStoreManagerErrorCauseImportChanges context:nil];
-            }
         }];
 
         dispatch_async(dispatch_get_main_queue(), ^{
