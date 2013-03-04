@@ -24,7 +24,6 @@
 @synthesize window						= _window;
 @synthesize managedObjectContext		= __managedObjectContext;
 @synthesize managedObjectModel			= __managedObjectModel;
-@synthesize persistentStoreCoordinator	= __persistentStoreCoordinator;
 @synthesize navigationController		= _navigationController;
 @synthesize splitViewController			= _splitViewController;
 @synthesize ubiquityStoreManager;
@@ -37,9 +36,8 @@
 {
 	// STEP 1 - Initialize the UbiquityStoreManager
 	ubiquityStoreManager = [[UbiquityStoreManager alloc] initStoreNamed:nil withManagedObjectModel:[self managedObjectModel]
-                                                          localStoreURL:[self storeURL] containerIdentifier:nil additionalStoreOptions:nil];
-	// STEP 2a  - Setup the delegate
-	ubiquityStoreManager.delegate = self;
+                                                          localStoreURL:[self storeURL] containerIdentifier:nil additionalStoreOptions:nil
+                                                               delegate:self];
 	
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
     // Override point for customization after application launch.
@@ -47,7 +45,6 @@
 	    masterViewController = [[MasterViewController alloc] initWithNibName:@"MasterViewController_iPhone" bundle:nil];
 	    self.navigationController = [[UINavigationController alloc] initWithRootViewController:masterViewController];
 	    self.window.rootViewController = self.navigationController;
-	    masterViewController.managedObjectContext = self.managedObjectContext;
 	} else {
 	    masterViewController = [[MasterViewController alloc] initWithNibName:@"MasterViewController_iPad" bundle:nil];
 	    UINavigationController *masterNavigationController = [[UINavigationController alloc] initWithRootViewController:masterViewController];
@@ -62,7 +59,6 @@
 	    self.splitViewController.viewControllers = [NSArray arrayWithObjects:masterNavigationController, detailNavigationController, nil];
 	    
 	    self.window.rootViewController = self.splitViewController;
-	    masterViewController.managedObjectContext = self.managedObjectContext;
 	}
     [self.window makeKeyAndVisible];
     return YES;
@@ -115,29 +111,6 @@
 
 #pragma mark - Core Data stack
 
-// Returns the managed object context for the application.
-// If the context doesn't already exist, it is created and bound to the persistent store coordinator for the application.
-- (NSManagedObjectContext *)managedObjectContext {
-    
-    if (__managedObjectContext != nil) {
-        return __managedObjectContext;
-    }
-    
-    NSPersistentStoreCoordinator *coordinator = [self persistentStoreCoordinator];
-	
-    if (coordinator != nil) {
-		NSManagedObjectContext* moc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
-        
-        [moc performBlockAndWait:^{
-            [moc setPersistentStoreCoordinator: coordinator];
-		}];
-		
-        __managedObjectContext = moc;
- 		__managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
-	}
-    return __managedObjectContext;
-}
-
 // Returns the managed object model for the application.
 // If the model doesn't already exist, it is created from the application's model.
 - (NSManagedObjectModel *)managedObjectModel {
@@ -151,18 +124,6 @@
 
 - (NSURL *)storeURL {
 	return [[self applicationDocumentsDirectory] URLByAppendingPathComponent:@"Sample.sqlite"];
-}
-
-// Returns the persistent store coordinator for the application.
-// If the coordinator doesn't already exist, it is created and the application's store added to it.
-- (NSPersistentStoreCoordinator *)persistentStoreCoordinator {
-    if (__persistentStoreCoordinator == nil) {
-		
-		// STEP 3 - Get the persistentStoreCoordinator from the UbiquityStoreManager
-        __persistentStoreCoordinator = [ubiquityStoreManager persistentStoreCoordinator];
-    }
-    
-    return __persistentStoreCoordinator;
 }
 
 #pragma mark - Application's Documents directory
@@ -190,13 +151,37 @@
 #pragma mark - UbiquityStoreManagerDelegate
 
 // STEP 4 - Implement the UbiquityStoreManager delegate methods
-
-- (NSManagedObjectContext *)managedObjectContextForUbiquityStoreManager:(UbiquityStoreManager *)usm {
-	return self.managedObjectContext;
+- (NSManagedObjectContext *)managedObjectContextForUbiquityChangesInManager:(UbiquityStoreManager *)manager {
+    return self.managedObjectContext;
 }
 
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didSwitchToiCloud:(BOOL)didSwitch {
-	[masterViewController.iCloudSwitch setOn:didSwitch animated:YES];
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager willLoadStoreIsCloud:(BOOL)isCloudStore {
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [masterViewController.iCloudSwitch setOn:isCloudStore animated:YES];
+        [masterViewController.storeLoadingActivity startAnimating];
+    });
+}
+
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreManagerErrorCause)cause wasCloud:(BOOL)wasCloudStore {
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [masterViewController.storeLoadingActivity stopAnimating];
+    });
+    manager.cloudEnabled = NO;
+}
+
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore {
+
+    NSManagedObjectContext *moc = [[NSManagedObjectContext alloc] initWithConcurrencyType:NSMainQueueConcurrencyType];
+    [moc setPersistentStoreCoordinator:coordinator];
+
+    __managedObjectContext = moc;
+    __managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [masterViewController.iCloudSwitch setOn:isCloudStore animated:YES];
+        [masterViewController.storeLoadingActivity stopAnimating];
+    });
 }
 
 @end
