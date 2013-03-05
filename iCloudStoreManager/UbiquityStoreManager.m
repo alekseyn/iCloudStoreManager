@@ -339,9 +339,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                     if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
                                                                        configuration:nil URL:cloudStoreURL
                                                                              options:cloudStoreOptions
-                                                                               error:&error]) {
+                                                                               error:&error])
                         [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
-                    }
 
                     break;
                 }
@@ -366,9 +365,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                         withType:NSSQLiteStoreType
                                                                            error:&error]) {
                         [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
-
-                        if (![self.persistentStoreCoordinator removePersistentStore:localStore error:&error])
-                            [self error:error cause:cause = UbiquityStoreManagerErrorCauseClearStore context:cloudStoreURL.path];
+                        [self clearStore];
                     }
                     break;
                 }
@@ -388,9 +385,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                     if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
                                                                        configuration:nil URL:cloudStoreURL
                                                                              options:cloudStoreOptions
-                                                                               error:&error]) {
+                                                                               error:&error])
                         [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
-                    }
 
                     break;
                 }
@@ -402,9 +398,8 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                     if (![self.persistentStoreCoordinator addPersistentStoreWithType:NSSQLiteStoreType
                                                                        configuration:nil URL:cloudStoreURL
                                                                              options:cloudStoreOptions
-                                                                               error:&error]) {
+                                                                               error:&error])
                         [self error:error cause:cause = UbiquityStoreManagerErrorCauseOpenCloudStore context:cloudStoreURL.path];
-                    }
                     break;
                 }
             }
@@ -417,11 +412,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 [userInfo setObject:error forKey:NSUnderlyingErrorKey];
             [self error:[NSError errorWithDomain:NSCocoaErrorDomain code:0 userInfo:userInfo]
                   cause:UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:exception];
-            
-            // Clean up any local stores that may still be present.
-            for (NSPersistentStore *store in self.persistentStoreCoordinator.persistentStores)
-                if (![self.persistentStoreCoordinator removePersistentStore:store error:&error])
-                    [self error:error cause:UbiquityStoreManagerErrorCauseClearStore context:store];
+            [self clearStore];
         }
         @finally {
             BOOL cloudWasEnabled = [self.persistentStoreCoordinator.persistentStores count] > 0;
@@ -431,7 +422,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                 [self observeStore];
             }
             else {
-                // TODO: If this happens, the cloud store on this device is desynced.  We should destroy it either locally or ubiquitously.
+                // TODO: If this happens, the cloud store is desynced.  Until we destroy it or fix it (seems impossible), iCloud will be unavailable to the user.
                 [self resetTentativeStoreUUID];
 
                 if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:)]) {
@@ -821,9 +812,14 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             [moc mergeChangesFromContextDidSaveNotification:note];
 
             NSError *error = nil;
-            if (![moc save:&error])
-                // TODO: If this happens, the cloud store on this device is desynced.  We should destroy it either locally or ubiquitously.
+            if (![moc save:&error]) {
+                // TODO: If this happens, the cloud store is desynced.  Until we destroy it or fix it (seems impossible), iCloud will be unavailable to the user.
                 [self error:error cause:UbiquityStoreManagerErrorCauseImportChanges context:note];
+
+                // Try to reload the store to see if it's still viable.
+                // If not, either the application will handle it or we'll fall back to the local store.
+                [self loadStore];
+            }
         }];
 
         dispatch_async(dispatch_get_main_queue(), ^{
