@@ -63,10 +63,10 @@
 					<object class="IBUISwitch" id="36285388">
 						<reference key="NSNextResponder" ref="225560233"/>
 						<int key="NSvFlags">292</int>
-						<string key="NSFrame">{{146, 20}, {94, 27}}</string>
+						<string key="NSFrame">{{156, 20}, {94, 27}}</string>
 						<reference key="NSSuperview" ref="225560233"/>
 						<reference key="NSWindow"/>
-						<reference key="NSNextKeyView" ref="463944279"/>
+						<reference key="NSNextKeyView" ref="526794312"/>
 						<string key="NSReuseIdentifierKey">_NS:9</string>
 						<bool key="IBUIOpaque">NO</bool>
 						<string key="targetRuntimeIdentifier">IBCocoaTouchFramework</string>
@@ -77,7 +77,7 @@
 					<object class="IBUILabel" id="332494513">
 						<reference key="NSNextResponder" ref="225560233"/>
 						<int key="NSvFlags">292</int>
-						<string key="NSFrame">{{81, 22}, {129, 24}}</string>
+						<string key="NSFrame">{{24, 22}, {129, 24}}</string>
 						<reference key="NSSuperview" ref="225560233"/>
 						<reference key="NSWindow"/>
 						<reference key="NSNextKeyView" ref="36285388"/>
@@ -96,6 +96,7 @@
 						<nil key="IBUIHighlightedColor"/>
 						<int key="IBUIBaselineAdjustment">0</int>
 						<float key="IBUIMinimumFontSize">10</float>
+						<int key="IBUITextAlignment">2</int>
 						<object class="IBUIFontDescription" key="IBUIFontDescription">
 							<int key="type">2</int>
 							<double key="pointSize">20</double>
@@ -106,10 +107,10 @@
 							<int key="NSfFlags">16</int>
 						</object>
 					</object>
-					<object class="IBUIButton" id="463944279">
+					<object class="IBUIButton" id="859212897">
 						<reference key="NSNextResponder" ref="225560233"/>
 						<int key="NSvFlags">292</int>
-						<string key="NSFrame">{{81, 73}, {159, 37}}</string>
+						<string key="NSFrame">{{171, 67}, {130, 44}}</string>
 						<reference key="NSSuperview" ref="225560233"/>
 						<reference key="NSWindow"/>
 						<string key="NSReuseIdentifierKey">_NS:9</string>
@@ -118,32 +119,56 @@
 						<int key="IBUIContentHorizontalAlignment">0</int>
 						<int key="IBUIContentVerticalAlignment">0</int>
 						<int key="IBUIButtonType">1</int>
-						<string key="IBUINormalTitle">Clear iCloud Data</string>
+						<string key="IBUINormalTitle">Rebuild iCloud</string>
 						<reference key="IBUIHighlightedTitleColor" ref="379331634"/>
 						<object class="NSColor" key="IBUINormalTitleColor">
 							<int key="NSColorSpace">1</int>
 							<bytes key="NSRGB">MC4xOTYwNzg0MzQ2IDAuMzA5ODAzOTMyOSAwLjUyMTU2ODY1NgA</bytes>
 						</object>
-						<object class="NSColor" key="IBUINormalTitleShadowColor">
+						<object class="NSColor" key="IBUINormalTitleShadowColor" id="608258941">
 							<int key="NSColorSpace">3</int>
 							<bytes key="NSWhite">MC41AA</bytes>
 						</object>
-						<object class="IBUIFontDescription" key="IBUIFontDescription">
+						<object class="IBUIFontDescription" key="IBUIFontDescription" id="744985770">
 							<int key="type">2</int>
 							<double key="pointSize">15</double>
 						</object>
-						<object class="NSFont" key="IBUIFont">
+						<object class="NSFont" key="IBUIFont" id="966689090">
 							<string key="NSName">Helvetica-Bold</string>
 							<double key="NSSize">15</double>
 							<int key="NSfFlags">16</int>
 						</object>
 					</object>
+					<object class="IBUIButton" id="933083710">
+						<reference key="NSNextResponder" ref="225560233"/>
+						<int key="NSvFlags">292</int>
+						<string key="NSFrame">{{40, 67}, {113, 44}}</string>
+						<reference key="NSSuperview" ref="225560233"/>
+						<reference key="NSWindow"/>
+						<reference key="NSNextKeyView" ref="859212897"/>
+						<string key="NSReuseIdentifierKey">_NS:9</string>
+						<bool key="IBUIOpaque">NO</bool>
+						<string key="targetRuntimeIdentifier">IBCocoaTouchFramework</string>
+						<int key="IBUIContentHorizontalAlignment">0</int>
+						<int key="IBUIContentVerticalAlignment">0</int>
+						<int key="IBUIButtonType">1</int>
+						<string key="IBUINormalTitle">Clear iCloud</string>
+						<reference key="IBUIHighlightedTitleColor" ref="379331634"/>
+						<object class="NSColor" key="IBUINormalTitleColor">
+							<int key="NSColorSpace">1</int>
+							<bytes key="NSRGB">MC4xOTYwNzg0MzQ2IDAuMzA5ODAzOTMyOSAwLjUyMTU2ODY1NgA</bytes>
+						</object>
+						<reference key="IBUINormalTitleShadowColor" ref="608258941"/>
+						<reference key="IBUIFontDescription" ref="744985770"/>
+						<reference key="IBUIFont" ref="966689090"/>
+					</object>
 					<object class="IBUIActivityIndicatorView" id="526794312">
 						<reference key="NSNextResponder" ref="225560233"/>
 						<int key="NSvFlags">-2147483356</int>
-						<string key="NSFrame">{{246, 24}, {20, 20}}</string>
+						<string key="NSFrame">{{256, 24}, {20, 20}}</string>
 						<reference key="NSSuperview" ref="225560233"/>
 						<reference key="NSWindow"/>
+						<reference key="NSNextKeyView" ref="933083710"/>
 						<string key="NSReuseIdentifierKey">_NS:9</string>
 						<bool key="IBUIOpaque">NO</bool>
 						<string key="targetRuntimeIdentifier">IBCocoaTouchFramework</string>
@@ -193,14 +218,6 @@
 				</object>
 				<object class="IBConnectionRecord">
 					<object class="IBCocoaTouchOutletConnection" key="connection">
-						<string key="label">clearButton</string>
-						<reference key="source" ref="841351856"/>
-						<reference key="destination" ref="463944279"/>
-					</object>
-					<int key="connectionID">14</int>
-				</object>
-				<object class="IBConnectionRecord">
-					<object class="IBCocoaTouchOutletConnection" key="connection">
 						<string key="label">storeLoadingActivity</string>
 						<reference key="source" ref="841351856"/>
 						<reference key="destination" ref="526794312"/>
@@ -234,12 +251,21 @@
 				</object>
 				<object class="IBConnectionRecord">
 					<object class="IBCocoaTouchEventConnection" key="connection">
-						<string key="label">cleariCloud:</string>
-						<reference key="source" ref="463944279"/>
+						<string key="label">rebuildiCloud:</string>
+						<reference key="source" ref="859212897"/>
 						<reference key="destination" ref="841351856"/>
 						<int key="IBEventType">7</int>
 					</object>
-					<int key="connectionID">13</int>
+					<int key="connectionID">23</int>
+				</object>
+				<object class="IBConnectionRecord">
+					<object class="IBCocoaTouchEventConnection" key="connection">
+						<string key="label">cleariCloud:</string>
+						<reference key="source" ref="933083710"/>
+						<reference key="destination" ref="841351856"/>
+						<int key="IBEventType">7</int>
+					</object>
+					<int key="connectionID">22</int>
 				</object>
 			</array>
 			<object class="IBMutableOrderedSet" key="objectRecords">
@@ -270,9 +296,10 @@
 						<int key="objectID">6</int>
 						<reference key="object" ref="225560233"/>
 						<array class="NSMutableArray" key="children">
-							<reference ref="463944279"/>
 							<reference ref="36285388"/>
 							<reference ref="332494513"/>
+							<reference ref="859212897"/>
+							<reference ref="933083710"/>
 							<reference ref="526794312"/>
 						</array>
 						<reference key="parent" ref="0"/>
@@ -289,13 +316,18 @@
 						<reference key="parent" ref="225560233"/>
 					</object>
 					<object class="IBObjectRecord">
-						<int key="objectID">12</int>
-						<reference key="object" ref="463944279"/>
+						<int key="objectID">15</int>
+						<reference key="object" ref="526794312"/>
 						<reference key="parent" ref="225560233"/>
 					</object>
 					<object class="IBObjectRecord">
-						<int key="objectID">15</int>
-						<reference key="object" ref="526794312"/>
+						<int key="objectID">17</int>
+						<reference key="object" ref="859212897"/>
+						<reference key="parent" ref="225560233"/>
+					</object>
+					<object class="IBObjectRecord">
+						<int key="objectID">21</int>
+						<reference key="object" ref="933083710"/>
 						<reference key="parent" ref="225560233"/>
 					</object>
 				</array>
@@ -305,9 +337,10 @@
 				<string key="-1.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
 				<string key="-2.CustomClassName">UIResponder</string>
 				<string key="-2.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
-				<string key="12.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
 				<string key="15.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
+				<string key="17.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
 				<string key="2.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
+				<string key="21.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
 				<string key="6.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
 				<string key="7.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
 				<string key="8.IBPluginDependency">com.apple.InterfaceBuilder.IBCocoaTouchPlugin</string>
@@ -316,7 +349,7 @@
 			<nil key="activeLocalization"/>
 			<dictionary class="NSMutableDictionary" key="localizations"/>
 			<nil key="sourceID"/>
-			<int key="maxID">16</int>
+			<int key="maxID">23</int>
 		</object>
 		<object class="IBClassDescriber" key="IBDocument.Classes">
 			<array class="NSMutableArray" key="referencedPartialClassDescriptions">
@@ -325,11 +358,16 @@
 					<string key="superclassName">UITableViewController</string>
 					<dictionary class="NSMutableDictionary" key="actions">
 						<string key="cleariCloud:">id</string>
+						<string key="rebuildiCloud:">id</string>
 						<string key="setiCloudState:">id</string>
 					</dictionary>
 					<dictionary class="NSMutableDictionary" key="actionInfosByName">
 						<object class="IBActionInfo" key="cleariCloud:">
 							<string key="name">cleariCloud:</string>
+							<string key="candidateClassName">id</string>
+						</object>
+						<object class="IBActionInfo" key="rebuildiCloud:">
+							<string key="name">rebuildiCloud:</string>
 							<string key="candidateClassName">id</string>
 						</object>
 						<object class="IBActionInfo" key="setiCloudState:">

@@ -166,17 +166,25 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:didEncounterError:cause:context:)])
         [self.delegate ubiquityStoreManager:self didEncounterError:error cause:cause context:context];
     else {
-        [self log:@"error: %@, cause: %u, context: %@", error, cause, context];
+        [self log:@"Error (cause:%u): %@", cause, error];
 
+        if (context)
+            [self log:@"    - Context   : %@", context];
+        NSError *underlyingError = [[error userInfo] objectForKey:NSUnderlyingErrorKey];
+        if (underlyingError)
+            [self log:@"    - Underlying: %@", underlyingError];
         NSArray *detailedErrors = [[error userInfo] objectForKey:NSDetailedErrorsKey];
         for (NSError *detailedError in detailedErrors)
-            [self log:@"    - detailed error: %@", detailedError];
+            [self log:@"    - Detail    : %@", detailedError];
     }
 }
 
 #pragma mark - Store Management
 
 - (void)clearStore {
+
+    if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:willLoadStoreIsCloud:)])
+        [self.delegate ubiquityStoreManager:self willLoadStoreIsCloud:self.cloudEnabled];
 
     // Remove store observers.
     [NSFileCoordinator removeFilePresenter:self];
@@ -323,7 +331,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
                         if (![cloudCoordinator removePersistentStore:cloudStore error:&error])
                             [self error:error cause:cause = UbiquityStoreManagerErrorCauseClearStore context:cloudStoreURL.path];
-                        [self removeItemAtURL:cloudStoreURL];
+                        [self removeItemAtURL:cloudStoreURL localOnly:NO];
                         break;
                     }
 
@@ -372,7 +380,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                         manuallyMigrateStore:localStoreURL withOptions:localStoreOptions
                                                      toStore:cloudStoreURL withOptions:cloudStoreOptions error:&error]) {
                         [self error:error cause:cause = UbiquityStoreManagerErrorCauseMigrateLocalToCloudStore context:cloudStoreURL.path];
-                        [self removeItemAtURL:cloudStoreURL];
+                        [self removeItemAtURL:cloudStoreURL localOnly:NO];
                         break;
                     }
 
@@ -589,7 +597,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 #endif
 }
 
-- (void)removeItemAtURL:(NSURL *)directoryURL {
+- (void)removeItemAtURL:(NSURL *)directoryURL localOnly:(BOOL)localOnly {
 
     NSError *error = nil;
     [[[NSFileCoordinator alloc] initWithFilePresenter:nil] coordinateWritingItemAtURL:directoryURL
@@ -597,57 +605,66 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                                                                                 error:&error byAccessor:
      ^(NSURL *newURL) {
          NSError *error_ = nil;
-         if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
-             [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
+         if (localOnly && [[NSFileManager defaultManager] isUbiquitousItemAtURL:newURL]) {
+             if (![[NSFileManager defaultManager] evictUbiquitousItemAtURL:newURL error:&error_])
+                 [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
+         } else {
+             if (![[NSFileManager defaultManager] removeItemAtURL:newURL error:&error_])
+                 [self error:error_ cause:UbiquityStoreManagerErrorCauseDeleteStore context:newURL.path];
+         }
      }];
     if (error)
         [self error:error cause:UbiquityStoreManagerErrorCauseDeleteStore context:directoryURL.path];
 }
 
-- (BOOL)nukeCloudContainer {
+- (BOOL)deleteCloudContainerLocalOnly:(BOOL)localOnly {
     
     if (![self.persistentStoreCoordinator tryLock]) {
-        [self log:@"Cannot nuke the cloud container: Manager is locked."];
+        [self log:@"Cannot delete the cloud container: Manager is locked."];
         return NO;
     }
-    [self log:@"Will nuke the cloud container."];
+    [self log:@"Will delete the cloud container %@.", localOnly? @"on this device": @"on this device and in the cloud"];
 
     [self clearStore];
 
     // Delete the whole cloud container.
-    [self removeItemAtURL:[self URLForCloudContainer]];
+    [self removeItemAtURL:[self URLForCloudContainer] localOnly:localOnly];
     
     // Unset the storeUUID so a new one will be created.
     [self resetTentativeStoreUUID];
-    NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-    [cloud removeObjectForKey:StoreUUIDKey];
-    [cloud synchronize];
-    
+    if (!localOnly) {
+        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+        [cloud removeObjectForKey:StoreUUIDKey];
+        [cloud synchronize];
+    }
+
     [self.persistentStoreCoordinator unlock];
     [self loadStore];
 
     return YES;
 }
 
-- (BOOL)deleteCloudStore {
+- (BOOL)deleteCloudStoreLocalOnly:(BOOL)localOnly {
 
     if (![self.persistentStoreCoordinator tryLock]) {
         [self log:@"Cannot delete the cloud store: Manager is locked."];
         return NO;
     }
-    [self log:@"Will delete the cloud store (UUID:%@).", self.storeUUID];
+    [self log:@"Will delete the cloud store (UUID:%@) %@.", self.storeUUID, localOnly ? @"on this device" : @"on this device and in the cloud"];
 
     [self clearStore];
 
     // Clean up any cloud stores and transaction logs.
-    [self removeItemAtURL:[self URLForCloudStoreDirectory]];
-    [self removeItemAtURL:[self URLForCloudContentDirectory]];
+    [self removeItemAtURL:[self URLForCloudStoreDirectory] localOnly:localOnly];
+    [self removeItemAtURL:[self URLForCloudContentDirectory] localOnly:localOnly];
 
     // Unset the storeUUID so a new one will be created.
     [self resetTentativeStoreUUID];
-    NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-    [cloud removeObjectForKey:StoreUUIDKey];
-    [cloud synchronize];
+    if (!localOnly) {
+        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
+        [cloud removeObjectForKey:StoreUUIDKey];
+        [cloud synchronize];
+    }
 
     [self.persistentStoreCoordinator unlock];
     [self loadStore];
@@ -666,7 +683,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     [self clearStore];
 
     // Remove just the local store.
-    [self removeItemAtURL:[self URLForLocalStoreDirectory]];
+    [self removeItemAtURL:[self URLForLocalStoreDirectory] localOnly:YES];
 
     [self.persistentStoreCoordinator unlock];
     [self loadStore];

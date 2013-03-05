@@ -61,6 +61,7 @@ typedef enum {
  */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager willLoadStoreIsCloud:(BOOL)isCloudStore;
+
 /** Triggered when the store manager loads a persistence store.
  *
  * This is where you'll init/update your application's persistence layer.
@@ -68,6 +69,7 @@ typedef enum {
  */
 @required
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore;
+
 /** Triggered when the store manager fails to loads a persistence store.
  *
  * Useful to decide what to do to make a store available to the application.
@@ -76,13 +78,16 @@ typedef enum {
  */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreManagerErrorCause)cause wasCloud:(BOOL)wasCloudStore;
+
 /** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions in whatever way you see fit. */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error
                        cause:(UbiquityStoreManagerErrorCause)cause context:(id)context;
+
 /** Triggered whenever the store manager has information to share about its operation.  Mainly useful to plug in your own logger. */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
+
 /** Triggered when the store manager needs to perform a manual store migration.
  * @param error Write out an error object here when the migration fails.
  * @return YES when the migration was successful and the new store may be loaded.  NO to error out and not load the new store (new store will be cleaned up if it exists).
@@ -117,9 +122,20 @@ typedef enum {
  containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions delegate:(id<UbiquityStoreManagerDelegate>)delegate;
 
 /**
- * This will delete all the data from iCloud for this application.  There is no recovery.  A new iCloud store will be created if enabled.
+ * This will delete all the data from iCloud for this application.
+ *
+ * @param localOnly If YES, the iCloud data will be redownloaded when needed.  If NO, the container's data will be permanently lost.
+ *
+ * Unless you intend to delete more than just the active cloud store, you should probably use -deleteCloudStoreLocalOnly: instead.
  */
-- (BOOL)nukeCloudContainer;
+- (BOOL)deleteCloudContainerLocalOnly:(BOOL)localOnly;
+
+/**
+ * This will delete the iCloud store.
+ *
+ * @param localOnly If YES, the iCloud transaction logs will be redownloaded and the store rebuilt.  If NO, the store will be permanently lost and a new one will be created by migrating the device's local store.
+ */
+- (BOOL)deleteCloudStoreLocalOnly:(BOOL)localOnly;
 
 /**
  * This will delete the local store.  There is no recovery.
@@ -127,39 +143,33 @@ typedef enum {
 - (BOOL)deleteLocalStore;
 
 /**
- * This will delete the iCloud store.  Theoretically, it should be rebuilt from the iCloud transaction logs.
- * TODO: Verify claim.
+ * Determine whether it's safe to seed the cloud store with a local store.
  */
-- (BOOL)deleteCloudStore;
-
-/**
-* Determine whether it's safe to seed the cloud store with a local store.
-*/
 - (BOOL)cloudSafeForSeeding;
 
 /**
-* @return URL to the active app's ubiquity container.
-*/
+ * @return URL to the active app's ubiquity container.
+ */
 - (NSURL *)URLForCloudContainer;
 
 /**
-* @return URL to the directory where we put cloud store databases for this app.
-*/
+ * @return URL to the directory where we put cloud store databases for this app.
+ */
 - (NSURL *)URLForCloudStoreDirectory;
 
 /**
-* @return URL to the active cloud store's database.
-*/
+ * @return URL to the active cloud store's database.
+ */
 - (NSURL *)URLForCloudStore;
 
 /**
-* @return URL to the directory where we put cloud store transaction logs for this app.
-*/
+ * @return URL to the directory where we put cloud store transaction logs for this app.
+ */
 - (NSURL *)URLForCloudContentDirectory;
 
 /**
-* @return URL to the active cloud store's transaction logs.
-*/
+ * @return URL to the active cloud store's transaction logs.
+ */
 - (NSURL *)URLForCloudContent;
 
 /**
@@ -168,8 +178,8 @@ typedef enum {
 - (NSURL *)URLForLocalStoreDirectory;
 
 /**
-* @return URL to the local store's database.
-*/
+ * @return URL to the local store's database.
+ */
 - (NSURL *)URLForLocalStore;
 
 @end

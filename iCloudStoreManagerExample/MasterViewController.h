@@ -24,5 +24,6 @@
 
 - (IBAction)setiCloudState:(id)sender;
 - (IBAction)cleariCloud:(id)sender;
+- (IBAction)rebuildiCloud:(id)sender;
 
 @end

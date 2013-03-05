@@ -34,7 +34,12 @@
 - (IBAction)cleariCloud:(id)sender {
 	
 	// STEP 6 - UbiquityStoreManager hard reset. FOR TESTING ONLY! Do not expose to the end user!
-	[[[AppDelegate appDelegate] ubiquityStoreManager] nukeCloudContainer];
+	[[[AppDelegate appDelegate] ubiquityStoreManager] deleteCloudContainerLocalOnly:NO];
+}
+
+- (IBAction)rebuildiCloud:(id)sender {
+
+    [[[AppDelegate appDelegate] ubiquityStoreManager] deleteCloudContainerLocalOnly:YES];
 }
 
 - (id)initWithNibName:(NSString *)nibNameOrNil bundle:(NSBundle *)nibBundleOrNil
