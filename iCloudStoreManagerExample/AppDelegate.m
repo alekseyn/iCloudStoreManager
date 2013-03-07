@@ -163,7 +163,7 @@
     });
 }
 
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreManagerErrorCause)cause wasCloud:(BOOL)wasCloudStore {
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreErrorCause)cause context:(id)context wasCloud:(BOOL)wasCloudStore {
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [masterViewController.storeLoadingActivity stopAnimating];
