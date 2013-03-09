@@ -23,14 +23,6 @@ extern NSString *const UbiquityManagedStoreDidChangeNotification;
  * The store managed by the ubiquity manager's coordinator imported changes from iCloud (eg. another device saved changes to iCloud).
  */
 extern NSString *const UbiquityManagedStoreDidImportChangesNotification;
-/**
- * The key at which the UUID of the device that is inhibiting exclusive access to the store can be found in the context of UbiquityStoreErrorCauseNoExclusiveAccess.
- */
-extern NSString *const UbiquityManagedStoreExclusiveDeviceUUIDKey;
-/**
- * The key at which the name of the device that is inhibiting exclusive access to the store can be found in the context of UbiquityStoreErrorCauseNoExclusiveAccess.
- */
-extern NSString *const UbiquityManagedStoreExclusiveDeviceNameKey;
 
 typedef enum {
     UbiquityStoreErrorCauseNoAccount, // The user is not logged into iCloud on this device.  There is no context.
@@ -41,7 +33,6 @@ typedef enum {
     UbiquityStoreErrorCauseOpenCloudStore, // Error occurred while opening the cloud store file.  context = the path of the store.
     UbiquityStoreErrorCauseMigrateLocalToCloudStore, // Error occurred while migrating the local store to the cloud.  context = the path of the store or exception that caused the problem.
     UbiquityStoreErrorCauseImportChanges, // Error occurred while importing changes from the cloud into the application's context.  context = the DidImportUbiquitousContentChanges notification.
-    UbiquityStoreErrorCauseNoExclusiveAccess // This device was unable to obtain exclusive access to the store.  context = a dictionary with keys UbiquityManagedStoreExclusiveDeviceUUIDKey, UbiquityManagedStoreExclusiveDeviceNameKey.
 } UbiquityStoreErrorCause;
 
 typedef enum {
@@ -50,13 +41,6 @@ typedef enum {
     UbiquityStoreMigrationStrategyManual, // Migrate using the delegate's -ubiquityStoreManager:manuallyMigrateStore:toStore:.
     UbiquityStoreMigrationStrategyNone, // Don't migrate, just create an empty destination store.
 } UbiquityStoreMigrationStrategy;
-
-typedef enum {
-    UbiquityStoreDesyncAvoidanceStrategyExclusiveAccess, // Avoid cloud desync by requesting exclusive access to the cloud store and failing to load the store if another device has it.  Persistence will be unavailable while another device has exclusive access.
-    UbiquityStoreDesyncAvoidanceStrategyExclusiveWriteAccess, // Avoid cloud desync by requesting exclusive access to the cloud store and opening the store read-only if another device has it.  Persistence will be read-only while another device has exclusive access.
-    UbiquityStoreDesyncAvoidanceStrategyExclusiveOrMigrateToLocal, // Avoid cloud desync by requesting exclusive access to the cloud store and migrating it to the local store if another device has it.  Persistence will be read-write but changes won't be synced while another device has exclusive access.
-    UbiquityStoreDesyncAvoidanceStrategyNone, // Don't try to avoid cloud desync.  If it happens, your application can try and cope with it from -ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:.
-} UbiquityStoreDesyncAvoidanceStrategy;
 
 @class UbiquityStoreManager;
 
@@ -126,12 +110,6 @@ typedef enum {
 
 /** Determines what strategy to use when migrating from one store to another (eg. local -> cloud).  Default is UbiquityStoreMigrationStrategyCopyEntities. */
 @property (nonatomic, assign) UbiquityStoreMigrationStrategy migrationStrategy;
-
-/** Determines what strategy to use to avoid causing the cloud store on different devices to get desynced.  Default is UbiquityStoreDesyncAvoidanceStrategyExclusiveAccess.
- *
- * Because of bugs in iOS' iCloud implementation, desyncs happen when two devices simultaneously mutate a relationship.
- */
-@property (nonatomic, assign) UbiquityStoreDesyncAvoidanceStrategy desyncAvoidanceStrategy;
 
 /** Indicates whether the iCloud store or the local store is in use. */
 @property (nonatomic) BOOL cloudEnabled;

@@ -18,15 +18,7 @@
 
 NSString *const UbiquityManagedStoreDidChangeNotification = @"UbiquityManagedStoreDidChangeNotification";
 NSString *const UbiquityManagedStoreDidImportChangesNotification = @"UbiquityManagedStoreDidImportChangesNotification";
-NSString *const UbiquityManagedStoreExclusiveDeviceUUIDKey = @"UbiquityManagedStoreExclusiveDeviceUUIDKey";
-NSString *const UbiquityManagedStoreExclusiveDeviceNameKey = @"UbiquityManagedStoreExclusiveDeviceNameKey";
 NSString *const StoreUUIDKey                         = @"USMStoreUUIDKey"; // cloud: The UUID of the active cloud store.
-NSString *const DeviceUUIDKey                        = @"USMDeviceUUIDKey"; // local: The UUID of this device when checking exclusive access.
-NSString *const StoreAccessDevicesKey                = @"USMStoreAccessDevicesKey"; // cloud: device UUIDs
-NSString *const StoreAccessUUIDKey                   = @"USMStoreAccessUUIDKey"; // cloud: the UUID of the device.
-NSString *const StoreAccessNameKey                   = @"USMStoreAccessNameKey"; // cloud: the name of the device.
-NSString *const StoreAccessTicketKey                 = @"USMStoreAccessTicketKey"; // cloud: the ticket of the device.
-NSString *const StoreAccessChoosingKey               = @"USMStoreAccessChoosingKey"; // cloud: whether the device is choosing a ticket.
 NSString *const CloudEnabledKey                      = @"USMCloudEnabledKey"; // local: Whether the user wants the app on this device to use iCloud.
 NSString *const CloudStoreDirectory                  = @"CloudStore.nosync";
 NSString *const CloudLogsDirectory                   = @"CloudLogs";
@@ -43,7 +35,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 @property (nonatomic, strong) NSOperationQueue     *persistentStorageQueue;
 @property (nonatomic, strong) NSPersistentStoreCoordinator *persistentStoreCoordinator;
 
-@property(nonatomic) BOOL haveExclusiveAccess;
 @property(nonatomic, strong) id <NSObject, NSCopying, NSCoding> currentIdentityToken;
 @end
 
@@ -73,7 +64,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 
     // Private vars.
     _migrationStrategy = UbiquityStoreMigrationStrategyCopyEntities;
-    _desyncAvoidanceStrategy = UbiquityStoreDesyncAvoidanceStrategyExclusiveAccess;
     _persistentStorageQueue = [NSOperationQueue new];
     _persistentStorageQueue.name = [NSString stringWithFormat:@"%@PersistenceQueue", NSStringFromClass([self class])];
     _persistentStorageQueue.maxConcurrentOperationCount = 1;
@@ -240,28 +230,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
         self.persistentStoreCoordinator = [[NSPersistentStoreCoordinator alloc] initWithManagedObjectModel:self.model];
         [self.persistentStoreCoordinator lock];
     }
-
-    // Store cleared.  Relinquish exclusive access if we have it.
-    if (self.haveExclusiveAccess) {
-        // TODO: Can a device inadvertently stop using the store without relinquishing its ticket?  Probably.  Must handle.
-        NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
-        NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-        NSString *ownDeviceUUID = [local objectForKey:DeviceUUIDKey];
-        if (ownDeviceUUID && ownDeviceUUID != (id)[NSNull null]) {
-            NSMutableDictionary *ownDevice = [[cloud dictionaryForKey:ownDeviceUUID] mutableCopy];
-            id ownTicketObject = [ownDevice objectForKey:StoreAccessTicketKey];
-            int ownTicket = [ownTicketObject respondsToSelector:@selector(intValue)] ? [ownTicketObject intValue] : 0;
-            if (ownTicket) {
-                [self log:@"Relinquishing our exclusive access ticket: %d", [ownTicketObject intValue]];
-
-                [ownDevice setObject:@0 forKey:StoreAccessTicketKey];
-                [cloud setDictionary:ownDevice forKey:ownDeviceUUID];
-                [cloud synchronize];
-            }
-        }
-
-        self.haveExclusiveAccess = NO;
-    }
 }
 
 - (void)loadStore {
@@ -297,120 +265,6 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
             if (![self URLForCloudContainer]) {
                 cause = UbiquityStoreErrorCauseNoAccount;
                 return;
-            }
-
-            // Check for exclusive access.
-            if (self.desyncAvoidanceStrategy != UbiquityStoreDesyncAvoidanceStrategyNone) {
-                // Try to obtain exclusive access for this device based on Lamport's bakery algorithm.
-                NSUserDefaults *local = [NSUserDefaults standardUserDefaults];
-                NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-                [cloud synchronize];
-                [self log:@"Cloud KVS: %@", [cloud dictionaryRepresentation]];
-
-                // Get the UUID and state dictionary of our device.
-                NSString *ownDeviceUUID = [local objectForKey:DeviceUUIDKey];
-                if (!ownDeviceUUID)
-                    [local setObject:ownDeviceUUID = [[NSUUID UUID] UUIDString] forKey:DeviceUUIDKey];
-                NSMutableArray *deviceUUIDs = [[cloud arrayForKey:StoreAccessDevicesKey] mutableCopy];
-                if (!deviceUUIDs)
-                    [cloud setArray:deviceUUIDs = [NSMutableArray array] forKey:StoreAccessDevicesKey];
-                if (![deviceUUIDs containsObject:ownDeviceUUID]) {
-                    [deviceUUIDs addObject:ownDeviceUUID];
-                    [cloud setArray:deviceUUIDs forKey:StoreAccessDevicesKey];
-                }
-                NSString *ownName = [[UIDevice currentDevice] name];
-                NSMutableDictionary *ownDevice = [[cloud dictionaryForKey:ownDeviceUUID] mutableCopy];
-                if (!ownDevice)
-                    [cloud setDictionary:ownDevice = [NSMutableDictionary dictionaryWithObject:ownDeviceUUID forKey:StoreAccessUUIDKey] forKey:ownDeviceUUID];
-                if (![[ownDevice objectForKey:StoreAccessNameKey] isEqual:ownName]) {
-                    [ownDevice setObject:ownName forKey:StoreAccessNameKey];
-                    [cloud setObject:ownDevice forKey:ownDeviceUUID];
-                }
-
-                // Check whether we have a ticket and let other devices know our device name.
-                id ownTicketObject = [ownDevice objectForKey:StoreAccessTicketKey];
-                int ownTicket = [ownTicketObject respondsToSelector:@selector(intValue)]? [ownTicketObject intValue]: 0;
-
-                // If we don't have a ticket yet, choose one.
-                if (!ownTicket) {
-                    [ownDevice setObject:@YES forKey:StoreAccessChoosingKey];
-                    [cloud setDictionary:ownDevice forKey:ownDeviceUUID];
-                    [cloud synchronize];
-                    
-                    int maxTicket = 0;
-                    for (NSString *deviceUUID in deviceUUIDs) {
-                        NSDictionary *device = [cloud dictionaryForKey:deviceUUID];
-                        if (!device || device == (id)[NSNull null])
-                            continue;
-                        int deviceTicket = [[device objectForKey:StoreAccessTicketKey] intValue];
-                        maxTicket = MAX(maxTicket, deviceTicket);
-                    }
-                    
-                    ownTicket = maxTicket + 1;
-                    [ownDevice setObject:@NO forKey:StoreAccessChoosingKey];
-                    [ownDevice setObject:@(ownTicket) forKey:StoreAccessTicketKey];
-                    [cloud setDictionary:ownDevice forKey:ownDeviceUUID];
-                    [self log:@"We don't have a ticket yet.  Chose ticket: %d", ownTicket];
-                } else
-                    [self log:@"Using our existing ticket: %d", ownTicket];
-
-                // Check to see if our ticket gives us access to the store.
-                [cloud synchronize];
-                NSDictionary *exclusiveDevice = nil;
-                for (NSString *deviceUUID in deviceUUIDs)
-                    if (![deviceUUID isEqualToString:ownDeviceUUID]) {
-                        NSDictionary *device = [cloud dictionaryForKey:deviceUUID];
-                        BOOL deviceChoosing = !device || device == (id) [NSNull null] || [[device objectForKey:StoreAccessChoosingKey] boolValue];
-                        if (deviceChoosing) {
-                            // Another device is picking a ticket, we can't assert access yet.
-                            [self log:@"Device is choosing: %@", device];
-                            exclusiveDevice = device;
-                            break;
-                        }
-
-                        int deviceTicket = [[device objectForKey:StoreAccessTicketKey] intValue];
-                        if (deviceTicket && (deviceTicket < ownTicket || (deviceTicket == ownTicket && [deviceUUID compare:ownDeviceUUID] == NSOrderedAscending))) {
-                            // Another device has a ticket that comes before ours (or is the same as ours but their UUID sorts first).
-                            // We can't assert access until this device relinquishes their ticket.
-                            [self log:@"Device's ticket beats ours (%d): %@", ownTicket, device];
-                            exclusiveDevice = device;
-                            break;
-                        }
-                    }
-
-                if (!exclusiveDevice)
-                    // No device is inhibiting exclusive access.  Our ticket will assert our access to the other devices.
-                    self.haveExclusiveAccess = YES;
-                    
-                else {
-                    // Another device is inhibiting exclusive access for now.
-                    // Let the strategy decide what to do in the mean time.
-                    switch (self.desyncAvoidanceStrategy) {
-                        case UbiquityStoreDesyncAvoidanceStrategyExclusiveAccess: {
-                            // Fail loading the store.
-                            cause = UbiquityStoreErrorCauseNoExclusiveAccess;
-                            context = exclusiveDevice;
-                            return;
-                        }
-                        case UbiquityStoreDesyncAvoidanceStrategyExclusiveWriteAccess: {
-                            // Open the store read-only.
-                            // TODO: Beware: this may cause trouble when importing ubiquity changes.
-                            [NSException raise:NSGenericException
-                                        format:@"Strategy not yet implemented: UbiquityStoreDesyncAvoidanceStrategyExclusiveWriteAccess"];
-                            break;
-                        }
-                        case UbiquityStoreDesyncAvoidanceStrategyExclusiveOrMigrateToLocal: {
-                            // Migrate/copy our cloud store file to the local store and open that one instead.
-                            // TODO: Beware: if we set cloudEnabled = NO, we won't detect when we do gain exclusive access.
-                            [NSException raise:NSGenericException
-                                        format:@"Strategy not yet implemented: UbiquityStoreDesyncAvoidanceStrategyExclusiveOrMigrateToLocal"];
-                            break;
-                        }
-                        case UbiquityStoreDesyncAvoidanceStrategyNone:
-                            [NSException raise:NSInternalInconsistencyException
-                                        format:@"Strategy doesn't need exclusive access: UbiquityStoreDesyncAvoidanceStrategyNone"];
-                    }
-                }
             }
 
             // Create the path to the cloud store.
@@ -617,7 +471,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
                     [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidChangeNotification object:self userInfo:nil];
                 } else if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:failedLoadingStoreWithCause:context:wasCloud:)])
                     [self.delegate ubiquityStoreManager:self failedLoadingStoreWithCause:cause context:context wasCloud:YES];
-                else if (cause != UbiquityStoreErrorCauseNoExclusiveAccess)
+                else
                     self.cloudEnabled = NO;
             });
 
@@ -818,11 +672,7 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
     [self resetTentativeStoreUUID];
     if (!localOnly) {
         NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-        [cloud synchronize];
         [cloud removeObjectForKey:StoreUUIDKey];
-        for (NSString *deviceUUID in [cloud arrayForKey:StoreAccessDevicesKey])
-            [cloud removeObjectForKey:deviceUUID];
-        [cloud removeObjectForKey:StoreAccessDevicesKey];
         [cloud synchronize];
     }
 
@@ -958,20 +808,9 @@ NSString *const CloudLogsDirectory                   = @"CloudLogs";
 - (void)keyValueStoreChanged:(NSNotification *)note {
 
     NSArray *changedKeys = (NSArray *)[note.userInfo objectForKey:NSUbiquitousKeyValueStoreChangedKeysKey];
-    [self log:@"KVS changed.  Keys: %@", changedKeys];
     if ([changedKeys containsObject:StoreUUIDKey])
         // The UUID of the active store changed.  We need to switch to the newly activated store.
         [self cloudStoreChanged:nil];
-
-    if ([changedKeys containsObject:StoreAccessDevicesKey] ||
-            [changedKeys firstObjectCommonWithArray:[[NSUbiquitousKeyValueStore defaultStore] arrayForKey:StoreAccessDevicesKey]]) {
-        // Something changed with regards to exclusive access tickets.
-        if (self.cloudEnabled && !self.haveExclusiveAccess && self.desyncAvoidanceStrategy != UbiquityStoreDesyncAvoidanceStrategyNone) {
-            // Since cloud is enabled and we don't have exclusive access yet, let's see if we can claim it now.
-            [self log:@"Exclusive access tickets updated.  Checking whether we've gained exclusive access."];
-            [self loadStore];
-        }
-    }
 }
 
 /**

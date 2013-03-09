@@ -165,10 +165,6 @@
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreErrorCause)cause context:(id)context wasCloud:(BOOL)wasCloudStore {
 
-    if (cause == UbiquityStoreErrorCauseNoExclusiveAccess)
-        // Just wait for the store to become available.
-        return;
-
     dispatch_async(dispatch_get_main_queue(), ^{
         [masterViewController.storeLoadingActivity stopAnimating];
     });
