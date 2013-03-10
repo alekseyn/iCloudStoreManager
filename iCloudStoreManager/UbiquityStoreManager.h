@@ -57,7 +57,7 @@ typedef enum {
 
 /** Triggered when the store manager begins loading a persistence store.
  *
- * Between this and an invocation of -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: or -ubiquityStoreManager:failedLoadingStoreWithCause:wasCloud:, the application should not be using the persistence coordinator.
+ * Between this and an invocation of -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: or -ubiquityStoreManager:failedLoadingStoreWithCause:context:wasCloud:, the application should not be using the persistence coordinator.
  * You should probably unset your managed object contexts here to prevent exceptions/hangs in your applications (the coordinator is locked and its store removed).
  * Also useful for indicating in your user interface that the store is loading.
  */
@@ -77,21 +77,31 @@ typedef enum {
 /** Triggered when the store manager fails to loads a persistence store.
  *
  * Useful to decide what to do to make a store available to the application.
- * If you don't implement this, the default behaviour is to disable cloud when loading the cloud store fails and do nothing when loading the local store fails.  You can implement this simply with `manager.cloudEnabled = NO;`.
+ *
+ * If you don't implement this method, the manager will disable the cloud store and fall back to the local store when loading the cloud store fails.  It's the equivalent to implementing this method with `manager.cloudEnabled = NO;`.
  */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreErrorCause)cause context:(id)context wasCloud:(BOOL)wasCloudStore;
 
-/** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions in whatever way you see fit. */
+/** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions/logging in whatever way you see fit.
+ *
+ * If you don't implement this method, the manager will instead detail the error in a few log statements.
+ */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didEncounterError:(NSError *)error
                        cause:(UbiquityStoreErrorCause)cause context:(id)context;
 
-/** Triggered whenever the store manager has information to share about its operation.  Mainly useful to plug in your own logger. */
+/** Triggered whenever the store manager has information to share about its operation.  Mainly useful to plug in your own logger.
+ *
+ * If you don't implement this method, the manager will just log the message using NSLog.
+ */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager log:(NSString *)message;
 
 /** Triggered when the store manager needs to perform a manual store migration.
+ *
+ * Implementing this method is required if you set -migrationStrategy to UbiquityStoreMigrationStrategyManual.
+ *
  * @param error Write out an error object here when the migration fails.
  * @return YES when the migration was successful and the new store may be loaded.  NO to error out and not load the new store (new store will be cleaned up if it exists).
  */
