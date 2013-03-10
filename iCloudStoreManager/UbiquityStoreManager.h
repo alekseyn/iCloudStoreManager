@@ -16,7 +16,9 @@
 #import <CoreData/CoreData.h>
 
 /**
- * The store managed by the ubiquity manager's coordinator changed (eg. switched from iCloud to local).
+ * The store managed by the ubiquity manager's coordinator changed (eg. switching (no store) or switched to iCloud or local).
+ *
+ * This notification is posted after the -ubiquityStoreManager:willLoadStoreIsCloud: or -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: message was posted to the delegate.
  */
 extern NSString *const UbiquityManagedStoreDidChangeNotification;
 /**
@@ -65,7 +67,9 @@ typedef enum {
 /** Triggered when the store manager loads a persistence store.
  *
  * This is where you'll init/update your application's persistence layer.
- * You should probably create your main managed object context here.  Note the coordinator could change during the application's lifetime.
+ * You should probably create your main managed object context here.
+ *
+ * Note the coordinator could change during the application's lifetime (you'll get a new -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: if this happens).
  */
 @required
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore;
@@ -73,12 +77,7 @@ typedef enum {
 /** Triggered when the store manager fails to loads a persistence store.
  *
  * Useful to decide what to do to make a store available to the application.
- * You should probably unset your managed object contexts here to prevent exceptions in your applications (the coordinator has no more store).
  * If you don't implement this, the default behaviour is to disable cloud when loading the cloud store fails and do nothing when loading the local store fails.  You can implement this simply with `manager.cloudEnabled = NO;`.
- *
- * IMPORTANT: When this method is triggered, the store is likely irreparably broken.
- * Unless your application has a way to recover, you should probably delete the store in question (cloud/local).
- * Until you do, the user will remain unable to use that store.
  */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreErrorCause)cause context:(id)context wasCloud:(BOOL)wasCloudStore;
@@ -132,19 +131,19 @@ typedef enum {
  *
  * Unless you intend to delete more than just the active cloud store, you should probably use -deleteCloudStoreLocalOnly: instead.
  */
-- (BOOL)deleteCloudContainerLocalOnly:(BOOL)localOnly;
+- (void)deleteCloudContainerLocalOnly:(BOOL)localOnly;
 
 /**
  * This will delete the iCloud store.
  *
  * @param localOnly If YES, the iCloud transaction logs will be redownloaded and the store rebuilt.  If NO, the store will be permanently lost and a new one will be created by migrating the device's local store.
  */
-- (BOOL)deleteCloudStoreLocalOnly:(BOOL)localOnly;
+- (void)deleteCloudStoreLocalOnly:(BOOL)localOnly;
 
 /**
  * This will delete the local store.  There is no recovery.
  */
-- (BOOL)deleteLocalStore;
+- (void)deleteLocalStore;
 
 /**
  * Determine whether it's safe to seed the cloud store with a local store.

@@ -157,6 +157,7 @@
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager willLoadStoreIsCloud:(BOOL)isCloudStore {
 
+    __managedObjectContext = nil;
     dispatch_async(dispatch_get_main_queue(), ^{
         [masterViewController.iCloudSwitch setOn:isCloudStore animated:YES];
         [masterViewController.storeLoadingActivity startAnimating];
