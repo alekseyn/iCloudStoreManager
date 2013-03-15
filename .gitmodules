@@ -1,0 +1,3 @@
+[submodule "jrswizzle"]
+	path = jrswizzle
+	url = git://github.com/jonmarimba/jrswizzle.git
