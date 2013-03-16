@@ -51,9 +51,11 @@ typedef enum {
     UbiquityStoreErrorCauseDeleteStore, // Error occurred while deleting the store file or its transaction logs.  context = the path of the store.
     UbiquityStoreErrorCauseCreateStorePath, // Error occurred while creating the path where the store needs to be saved.  context = the path of the store.
     UbiquityStoreErrorCauseClearStore, // Error occurred while removing a store from the coordinator.  context = the store.
-    UbiquityStoreErrorCauseOpenLocalStore, // Error occurred while opening the local store file.  context = the path of the store.
-    UbiquityStoreErrorCauseOpenCloudStore, // Error occurred while opening the cloud store file.  context = the path of the store.
-    UbiquityStoreErrorCauseMigrateLocalToCloudStore, // Error occurred while migrating the local store to the cloud.  context = the path of the store or exception that caused the problem.
+    UbiquityStoreErrorCauseOpenLocalStore, // Error occurred while opening the local store.  context = the path of the store.
+    UbiquityStoreErrorCauseOpenCloudStore, // Error occurred while opening the cloud store.  context = the path of the store.
+    UbiquityStoreErrorCauseOpenMigrationStore, // Error occurred while opening the migration store.  context = the path of the store.
+    UbiquityStoreErrorCauseMigrateToCloudStore, // Error occurred while seeding the cloud content.  context = the path of the migrating store or exception that caused the problem.
+    UbiquityStoreErrorCauseMigrateToLocalStore, // Error occurred while seeding the local store.  context = the path of the migrating store.
     UbiquityStoreErrorCauseImportChanges, // Error occurred while importing changes from the cloud into the application's context.  context = the DidImportUbiquitousContentChanges notification.
 } UbiquityStoreErrorCause;
 
@@ -129,12 +131,12 @@ typedef enum {
  * When you receive this method, there are a few things you can do to handle the situation:
  * - Switch to the local store (manager.cloudEnabled = NO).
  *      NOTE: The cloud data and cloud syncing will be unavailable.
- * - Keep the existing cloud data but disable iCloud ([manager migrateCloudStoreToLocal]).
- *      NOTE: The existing local store will be lost.
- *      NOTE: After doing this, it would be prudent to delete the cloud store ([manager deleteCloudStoreLocalOnly:NO])
- *            so that enabling iCloud in the future will seed it with the new local store.
  * - Delete the cloud store and recreate it by seeding it with the local store ([manager deleteCloudStoreLocalOnly:NO]).
  *      NOTE: The existing cloud store will be lost.
+ * - Keep the existing cloud data but disable iCloud ([manager migrateCloudToLocalAndDeleteCloudStoreLocalOnly:NO]).
+ *      NOTE: The existing local store will be lost.
+ *      NOTE: You should set localOnly to NO so that the corruption is cleared and enabling iCloud in the future
+  *           will seed it with the new local store.
  * - Rebuild the cloud content by seeding it with the cloud store of this device ([manager rebuildCloudContentFromCloudStore]).
  *      NOTE: Any cloud changes on other devices that failed to sync to this device will be lost.
  *
@@ -217,7 +219,8 @@ typedef enum {
 /**
  * This will delete all the data from iCloud for this application.
  *
- * @param localOnly If YES, the iCloud data will be redownloaded when needed.  If NO, the container's data will be permanently lost.
+ * @param localOnly If YES, the iCloud data will be redownloaded when needed.
+ *                  If NO, the container's data will be permanently lost.
  *
  * Unless you intend to delete more than just the active cloud store, you should probably use -deleteCloudStoreLocalOnly: instead.
  */
@@ -226,23 +229,27 @@ typedef enum {
 /**
  * This will delete the iCloud store.
  *
- * @param localOnly If YES, the iCloud transaction logs will be redownloaded and the store rebuilt.  If NO, the store will be permanently lost and a new one will be created by migrating the device's local store.
+ * @param localOnly If YES, the iCloud transaction logs will be redownloaded and the store rebuilt.
+ *                  If NO, the store will be permanently lost and a new one will be created by migrating the device's local store.
  */
 - (void)deleteCloudStoreLocalOnly:(BOOL)localOnly;
 
 /**
- * This will delete the local store.  There is no recovery.
+ * This will delete the local store.
  */
 - (void)deleteLocalStore;
 
 /**
- * This will delete the local store and migrate the cloud store to a new local store.  There is no recovery.
+ * This will delete the local store and migrate the cloud store to a new local store.  The cloud store is subsequently deleted.  The device will subsequently load the new local store (disable cloud).
+ *
+ * @param localOnly If YES, the cloud content is not deleted from iCloud.
+ *                  If NO, the cloud store will be permanently lost and a new one will be created by migrating the new local store when iCloud is re-enabled.
  */
-- (void)migrateCloudStoreToLocal;
+- (void)migrateCloudToLocalAndDeleteCloudStoreLocalOnly:(BOOL)localOnly;
 
 /**
  * This will delete the cloud content and recreate a new cloud store by seeding it with the current cloud store.
- * Any cloud content and cloud store changes on other devices that are not present on this device's cloud store will be lost.  There is no recovery.
+ * Any cloud content and cloud store changes on other devices that are not present on this device's cloud store will be lost.
  */
 - (void)rebuildCloudContentFromCloudStore;
 
