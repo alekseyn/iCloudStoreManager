@@ -13,6 +13,8 @@
 #import "User.h"
 
 @interface AppDelegate ()
+@property(nonatomic, strong) UIAlertView *handleCloudContentAlert;
+
 - (NSURL *)storeURL;
 @end
 
@@ -148,6 +150,27 @@
 	return primaryUser;
 }
 
+#pragma mark - UIAlertViewDelegate
+
+- (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
+
+    if (alertView == self.handleCloudContentAlert) {
+        if (buttonIndex == [alertView firstOtherButtonIndex])
+            // Disable iCloud
+            self.ubiquityStoreManager.cloudEnabled = NO;
+        else if (buttonIndex == [alertView firstOtherButtonIndex] + 1)
+            // Lose iCloud data
+            [self.ubiquityStoreManager deleteCloudStoreLocalOnly:NO];
+        else if (buttonIndex == [alertView firstOtherButtonIndex] + 2)
+            // Make iCloud local
+            [self.ubiquityStoreManager migrateCloudToLocalAndDeleteCloudStoreLocalOnly:NO];
+        else if (buttonIndex == [alertView firstOtherButtonIndex] + 3)
+            // Fix iCloud
+            [self.ubiquityStoreManager rebuildCloudContentFromCloudStore];
+    }
+}
+
+
 #pragma mark - UbiquityStoreManagerDelegate
 
 // STEP 4 - Implement the UbiquityStoreManager delegate methods
@@ -180,8 +203,33 @@
     __managedObjectContext = moc;
     __managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
     dispatch_async(dispatch_get_main_queue(), ^{
+        if ([self.handleCloudContentAlert isVisible])
+            [self.handleCloudContentAlert dismissWithClickedButtonIndex:[self.handleCloudContentAlert cancelButtonIndex]
+                                                               animated:YES];
+
         [masterViewController.iCloudSwitch setOn:isCloudStore animated:YES];
         [masterViewController.storeLoadingActivity stopAnimating];
+    });
+}
+
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionIsCloud:(BOOL)isCloudStore {
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.handleCloudContentAlert = [[UIAlertView alloc] initWithTitle:@"Problem With iCloud Sync!" message:
+                @"An error has occurred within Apple's iCloud causing your devices to no longer "
+                        @"sync up properly.\n"
+                        @"To fix this, you can either:\n"
+                        @"- Disable iCloud\n"
+                        @"- Lose your iCloud data and start anew using your local data\n"
+                        @"- Make iCloud local and disable iCloud sync\n"
+                        @"- Fix iCloud sync\n\n"
+                        @"If you 'Make iCloud local', iCloud data will overwrite any local data you may have.\n\n"
+                        @"If you 'Fix iCloud' (same as 'Make iCloud local' and turning iCloud sync on again later), "
+                        @"be mindful on what device you do this on:  Any changes on other devices that failed to sync "
+                        @"will be lost."
+                                                                 delegate:self cancelButtonTitle:nil
+                                                        otherButtonTitles:@"Disable iCloud", @"Lose iCloud data", @"Make iCloud local", @"Fix iCloud", nil];
+        [self.handleCloudContentAlert show];
     });
 }
 

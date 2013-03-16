@@ -7,6 +7,8 @@
 
 #import "NSManagedObject+UbiquityStoreManager.h"
 
+NSString *const UbiquityManagedStoreDidDetectCorruptionNotification = @"UbiquityManagedStoreDidDetectCorruptionNotification";
+NSString *const StoreCorruptedKey = @"USMStoreCorruptedKey"; // cloud: Set to YES when a cloud content corruption has been detected.
 
 @implementation NSError (UbiquityStoreManager)
 
@@ -16,7 +18,7 @@
     if ([domain isEqualToString:NSCocoaErrorDomain] && code == 134302) {
         NSLog(@"Detected iCloud transaction log import failure: %@", self);
         NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-        [cloud setValue:@YES forKeyPath:StoreCorruptedKey];
+        [cloud setBool:YES forKey:StoreCorruptedKey];
         [cloud synchronize];
 
         [[NSNotificationCenter defaultCenter] postNotificationName:UbiquityManagedStoreDidDetectCorruptionNotification

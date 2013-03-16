@@ -11,7 +11,7 @@
 
 @class User;
 
-@interface AppDelegate : UIResponder <UIApplicationDelegate, UbiquityStoreManagerDelegate>
+@interface AppDelegate : UIResponder <UIApplicationDelegate, UIAlertViewDelegate, UbiquityStoreManagerDelegate>
 
 @property (strong, nonatomic) UIWindow *window;
 

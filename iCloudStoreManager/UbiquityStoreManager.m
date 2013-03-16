@@ -965,8 +965,10 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
 
     if ([changedKeys containsObject:StoreCorruptedKey])
         // Cloud content corruption was detected or cleared.
-        [self checkCloudContentCorruption:nil];
-
+        if (![self checkCloudContentCorruption:nil])
+            if (self.cloudEnabled && ![self.persistentStoreCoordinator.persistentStores count])
+                // Corruption was removed and our cloud store is not yet loaded.  Try loading the store again.
+                [self loadStore];
 }
 
 /**
@@ -979,12 +981,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
 
     NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
     if (![cloud boolForKey:StoreCorruptedKey]) {
-        // No corruption detected.
-        [self log:@"Cloud content corruption cleared."];
-
-        if (self.cloudEnabled && ![self.persistentStoreCoordinator.persistentStores count])
-            // Corruption was removed.  Try loading the store again.
-            [self loadStore];
+        //      [self loadStore];
 
         return NO;
     }
