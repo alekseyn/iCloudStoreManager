@@ -51,11 +51,9 @@ typedef enum {
     UbiquityStoreErrorCauseDeleteStore, // Error occurred while deleting the store file or its transaction logs.  context = the path of the store.
     UbiquityStoreErrorCauseCreateStorePath, // Error occurred while creating the path where the store needs to be saved.  context = the path of the store.
     UbiquityStoreErrorCauseClearStore, // Error occurred while removing a store from the coordinator.  context = the store.
-    UbiquityStoreErrorCauseOpenLocalStore, // Error occurred while opening the local store.  context = the path of the store.
-    UbiquityStoreErrorCauseOpenCloudStore, // Error occurred while opening the cloud store.  context = the path of the store.
-    UbiquityStoreErrorCauseOpenMigrationStore, // Error occurred while opening the migration store.  context = the path of the store.
-    UbiquityStoreErrorCauseMigrateToCloudStore, // Error occurred while seeding the cloud content.  context = the path of the migrating store or exception that caused the problem.
-    UbiquityStoreErrorCauseMigrateToLocalStore, // Error occurred while seeding the local store.  context = the path of the migrating store.
+    UbiquityStoreErrorCauseOpenActiveStore, // Error occurred while opening the active store.  context = the path of the store.
+    UbiquityStoreErrorCauseOpenSeedStore, // Error occurred while opening the seed store.  context = the path of the store.
+    UbiquityStoreErrorCauseSeedStore, // Error occurred while seeding the store.  context = the path of the seed store.
     UbiquityStoreErrorCauseImportChanges, // Error occurred while importing changes from the cloud into the application's context.  context = the DidImportUbiquitousContentChanges notification.
 } UbiquityStoreErrorCause;
 
