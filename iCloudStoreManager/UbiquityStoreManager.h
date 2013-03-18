@@ -96,7 +96,7 @@ typedef enum {
 
 /** Triggered when the store manager loads a persistence store.
  *
- * This is where you'll init/update your application's persistence layer.
+ * The manager is done handling the attempt to load the store.  This is where you'll init/update your application's persistence layer.
  * You should probably create your main managed object context here.
  *
  * Note the coordinator could change during the application's lifetime (you'll get a new -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud: if this happens).
@@ -106,6 +106,19 @@ typedef enum {
  */
 @required
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore;
+
+/** Triggered when the store manager fails to loads a persistence store.
+ *
+ * The manager is done handling the attempt to load the store.  The store will be unavailable unless another attempt is made to load the store.
+ *
+ * -ubiquityStoreManager:handleCloudContentCorruptionIsCloud: may get called later if the store that failed to load was the cloud store.
+ *
+ * @param wasCloudStore YES if the error was caused while attempting to load the cloud store.
+ *                      NO if the error was caused while attempting to load the local store.
+ */
+@optional
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreErrorCause)cause
+                     context:(id)context wasCloud:(BOOL)wasCloudStore;
 
 /** Triggered when the store manager has detected that the cloud content has failed to import on one of the devices.
  *
@@ -148,19 +161,6 @@ typedef enum {
 */
 @optional
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionIsCloud:(BOOL)isCloudStore;
-
-/** Triggered when the store manager fails to loads a persistence store.
- *
- * Useful to decide what to do to make a store available to the application.
- *
- * If you don't implement this method, the manager will disable the cloud store and fall back to the local store when loading the cloud store fails.  It's the equivalent to implementing this method with `manager.cloudEnabled = NO;`.
- *
- * @param wasCloudStore YES if the error was caused while attempting to load the cloud store.
- *                      NO if the error was caused while attempting to load the local store.
- */
-@optional
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager failedLoadingStoreWithCause:(UbiquityStoreErrorCause)cause
-                     context:(id)context wasCloud:(BOOL)wasCloudStore;
 
 /** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions/logging in whatever way you see fit.
  *

@@ -36,6 +36,8 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    NSLog(@"Starting iCloudStoreManagerExample on device: %@\n\n", [UIDevice currentDevice].name);
+
 	// STEP 1 - Initialize the UbiquityStoreManager
 	ubiquityStoreManager = [[UbiquityStoreManager alloc] initStoreNamed:nil withManagedObjectModel:[self managedObjectModel]
                                                           localStoreURL:[self storeURL] containerIdentifier:nil additionalStoreOptions:nil
@@ -192,7 +194,6 @@
     dispatch_async(dispatch_get_main_queue(), ^{
         [masterViewController.storeLoadingActivity stopAnimating];
     });
-    manager.cloudEnabled = NO;
 }
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore {
@@ -213,6 +214,9 @@
 }
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionIsCloud:(BOOL)isCloudStore {
+
+    if ([self.handleCloudContentAlert isVisible])
+        NSLog(@"already showing.");
 
     dispatch_async(dispatch_get_main_queue(), ^{
         self.handleCloudContentAlert = [[UIAlertView alloc] initWithTitle:@"Problem With iCloud Sync!" message:
