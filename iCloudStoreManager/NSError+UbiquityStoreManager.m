@@ -5,7 +5,7 @@
 //
 
 
-#import "NSManagedObject+UbiquityStoreManager.h"
+#import "NSError+UbiquityStoreManager.h"
 
 NSString *const UbiquityManagedStoreDidDetectCorruptionNotification = @"UbiquityManagedStoreDidDetectCorruptionNotification";
 NSString *const StoreCorruptedKey = @"USMStoreCorruptedKey"; // cloud: Set to YES when a cloud content corruption has been detected.

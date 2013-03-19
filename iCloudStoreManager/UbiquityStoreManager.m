@@ -8,7 +8,7 @@
 
 #import "UbiquityStoreManager.h"
 #import "JRSwizzle.h"
-#import "NSManagedObject+UbiquityStoreManager.h"
+#import "NSError+UbiquityStoreManager.h"
 
 #if TARGET_OS_IPHONE
 #import <UIKit/UIKit.h>
@@ -120,7 +120,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
 #endif
     [NSFileCoordinator addFilePresenter:self];
 
-    [self loadStore];
+    [self reloadStore];
     
     return self;
 }
@@ -291,7 +291,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
     });
 }
 
-- (void)loadStore {
+- (void)reloadStore {
 
     [self log:@"(Re)loading store..."];
     if ([self.delegate respondsToSelector:@selector(ubiquityStoreManager:willLoadStoreIsCloud:)])
@@ -807,7 +807,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
         }
 
         if (self.cloudEnabled)
-            [self loadStore];
+            [self reloadStore];
     }];
 }
 
@@ -828,7 +828,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
             [self createTentativeStoreUUID];
 
         if (self.cloudEnabled)
-            [self loadStore];
+            [self reloadStore];
     }];
 }
 
@@ -844,7 +844,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
         [self removeItemAtURL:[self URLForLocalStore] localOnly:YES];
 
         if (!self.cloudEnabled)
-            [self loadStore];
+            [self reloadStore];
     }];
 }
 
@@ -921,7 +921,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
         [local setBool:enabled forKey:CloudEnabledKey];
         [NSFileCoordinator addFilePresenter:self];
 
-        [self loadStore];
+        [self reloadStore];
     }];
 }
 
@@ -1022,7 +1022,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
 
 - (void)applicationWillEnterForeground:(NSNotification *)note {
 
-    [self loadStore];
+    [self reloadStore];
 }
 
 - (void)applicationDidEnterBackground:(NSNotification *)note {
@@ -1065,7 +1065,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
         if (![self checkCloudContentCorruption:nil])
             if (self.cloudEnabled && ![_persistentStoreCoordinator.persistentStores count])
                 // Corruption was removed and our cloud store is not yet loaded.  Try loading the store again.
-                [self loadStore];
+                [self reloadStore];
 }
 
 /**
@@ -1124,7 +1124,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
     // Reload the store.
     [self log:@"Cloud store changed.  StoreUUID: %@ (%@), Identity: %@",
                     self.storeUUID, _tentativeStoreUUID ? @"tentative" : @"definite", self.currentIdentityToken];
-    [self loadStore];
+    [self reloadStore];
 }
 
 - (void)mergeChanges:(NSNotification *)note {
@@ -1152,7 +1152,7 @@ NSString *const CloudContentDirectory                = @"CloudLogs";
                 // Try to reload the store to see if it's still viable.
                 // If not, either the application will handle it or we'll fall back to the local store.
                 // TODO: Verify that this works reliably.
-                [self loadStore];
+                [self reloadStore];
                 return;
             }
 

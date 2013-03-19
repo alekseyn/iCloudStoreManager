@@ -6,6 +6,7 @@
 //  Copyright (c) 2012 Yodel Code LLC. All rights reserved.
 //
 
+#import <CoreGraphics/CoreGraphics.h>
 #import "AppDelegate.h"
 #import "MasterViewController.h"
 #import "DetailViewController.h"
@@ -14,6 +15,8 @@
 
 @interface AppDelegate ()
 @property(nonatomic, strong) UIAlertView *handleCloudContentAlert;
+
+@property(nonatomic, strong) UIAlertView *handleCloudContentWarningAlert;
 
 - (NSURL *)storeURL;
 @end
@@ -38,7 +41,23 @@
 {
     NSLog(@"Starting iCloudStoreManagerExample on device: %@\n\n", [UIDevice currentDevice].name);
 
-	// STEP 1 - Initialize the UbiquityStoreManager
+    self.handleCloudContentAlert = [[UIAlertView alloc] initWithTitle:@"iCloud Sync Problem" message:
+            @"\n\n\n\nWaiting for another device to auto‑correct the problem..."
+                                                             delegate:self
+                                                    cancelButtonTitle:nil
+                                                    otherButtonTitles:@"Fix Now", nil];
+    UIActivityIndicatorView *activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
+    activityIndicator.center = CGPointMake(142, 90);
+    [activityIndicator startAnimating];
+    [self.handleCloudContentAlert addSubview:activityIndicator];
+    self.handleCloudContentWarningAlert = [[UIAlertView alloc] initWithTitle:@"Fix iCloud Now" message:
+            @"This problem can usually be auto‑corrected by opening the app on another device where you recently made changes.\n"
+                    @"If you wish to correct the problem from this device anyway, it is possible that recent changes on another device will be lost."
+                                                                    delegate:self
+                                                           cancelButtonTitle:@"Back"
+                                                           otherButtonTitles:@"Fix Anyway", nil];
+
+    // STEP 1 - Initialize the UbiquityStoreManager
 	ubiquityStoreManager = [[UbiquityStoreManager alloc] initStoreNamed:nil withManagedObjectModel:[self managedObjectModel]
                                                           localStoreURL:[self storeURL] containerIdentifier:nil additionalStoreOptions:nil
                                                                delegate:self];
@@ -156,18 +175,17 @@
 
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
 
-    if (alertView == self.handleCloudContentAlert) {
-        if (buttonIndex == [alertView firstOtherButtonIndex])
-            // Disable iCloud
-            self.ubiquityStoreManager.cloudEnabled = NO;
-        else if (buttonIndex == [alertView firstOtherButtonIndex] + 1)
-            // Lose iCloud data
-            [self.ubiquityStoreManager deleteCloudStoreLocalOnly:NO];
-        else if (buttonIndex == [alertView firstOtherButtonIndex] + 2)
-            // Make iCloud local
-            [self.ubiquityStoreManager migrateCloudToLocalAndDeleteCloudStoreLocalOnly:NO];
-        else if (buttonIndex == [alertView firstOtherButtonIndex] + 3)
-            // Fix iCloud
+    if (alertView == self.handleCloudContentAlert && buttonIndex == [alertView firstOtherButtonIndex])
+            // Fix Now
+        [self.handleCloudContentWarningAlert show];
+
+    if (alertView == self.handleCloudContentWarningAlert) {
+        if (buttonIndex == alertView.cancelButtonIndex)
+                // Back
+            [self.handleCloudContentAlert show];
+
+        if (buttonIndex == alertView.firstOtherButtonIndex)
+                // Fix Anyway
             [self.ubiquityStoreManager rebuildCloudContentFromCloudStore];
     }
 }
@@ -204,9 +222,10 @@
     __managedObjectContext = moc;
     __managedObjectContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if ([self.handleCloudContentAlert isVisible])
-            [self.handleCloudContentAlert dismissWithClickedButtonIndex:[self.handleCloudContentAlert cancelButtonIndex]
-                                                               animated:YES];
+        [self.handleCloudContentAlert dismissWithClickedButtonIndex:[self.handleCloudContentAlert firstOtherButtonIndex] + 9
+                                                           animated:YES];
+        [self.handleCloudContentWarningAlert dismissWithClickedButtonIndex:[self.handleCloudContentWarningAlert firstOtherButtonIndex] + 9
+                                                           animated:YES];
 
         [masterViewController.iCloudSwitch setOn:isCloudStore animated:YES];
         [masterViewController.storeLoadingActivity stopAnimating];
@@ -215,26 +234,12 @@
 
 - (void)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionIsCloud:(BOOL)isCloudStore {
 
-    if ([self.handleCloudContentAlert isVisible])
+    if ([self.handleCloudContentAlert isVisible] || [self.handleCloudContentWarningAlert isVisible])
         NSLog(@"already showing.");
-
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.handleCloudContentAlert = [[UIAlertView alloc] initWithTitle:@"Problem With iCloud Sync!" message:
-                @"An error has occurred within Apple's iCloud causing your devices to no longer "
-                        @"sync up properly.\n"
-                        @"To fix this, you can either:\n"
-                        @"- Disable iCloud\n"
-                        @"- Lose your iCloud data and start anew using your local data\n"
-                        @"- Make iCloud local and disable iCloud sync\n"
-                        @"- Fix iCloud sync\n\n"
-                        @"If you 'Make iCloud local', iCloud data will overwrite any local data you may have.\n\n"
-                        @"If you 'Fix iCloud' (same as 'Make iCloud local' and turning iCloud sync on again later), "
-                        @"be mindful on what device you do this on:  Any changes on other devices that failed to sync "
-                        @"will be lost."
-                                                                 delegate:self cancelButtonTitle:nil
-                                                        otherButtonTitles:@"Disable iCloud", @"Lose iCloud data", @"Make iCloud local", @"Fix iCloud", nil];
-        [self.handleCloudContentAlert show];
-    });
+    else
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.handleCloudContentAlert show];
+        });
 }
 
 @end

@@ -23,7 +23,7 @@
 //
 // Known issues:
 //  - Sometimes Apple's iCloud implementation hangs itself coordinating access for importing ubiquitous changes.
-//      - Reloading the store with -loadStore can sometimes cause these changes to get imported.
+//      - Reloading the store with -reloadStore can sometimes cause these changes to get imported.
 //      - If not, the app needs to be restarted.
 //  - Sometimes Apple's iCloud implementation will write corrupting transaction logs to the cloud container.
 //      - As a result, all other devices will fail to import any future changes to the store.
@@ -142,9 +142,9 @@ typedef enum {
  * When you receive this method, there are a few things you can do to handle the situation:
  * - Switch to the local store (manager.cloudEnabled = NO).
  *      NOTE: The cloud data and cloud syncing will be unavailable.
- * - Delete the cloud store and recreate it by seeding it with the local store ([manager deleteCloudStoreLocalOnly:NO]).
- *      NOTE: The existing cloud store will be lost.
- * - Keep the existing cloud data but disable iCloud ([manager migrateCloudToLocalAndDeleteCloudStoreLocalOnly:NO]).
+ * - Delete the cloud data and recreate it by seeding it with the local store ([manager deleteCloudStoreLocalOnly:NO]).
+ *      NOTE: The existing cloud data will be lost.
+ * - Make the existing cloud data local and disable iCloud ([manager migrateCloudToLocalAndDeleteCloudStoreLocalOnly:NO]).
  *      NOTE: The existing local store will be lost.
  *      NOTE: You should set localOnly to NO so that the corruption is cleared and enabling iCloud in the future
   *           will seed it with the new local store.
@@ -214,6 +214,15 @@ typedef enum {
 - (id)initStoreNamed:(NSString *)contentName withManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)localStoreURL
  containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions delegate:(id<UbiquityStoreManagerDelegate>)delegate;
 
+#pragma mark - Store Management
+
+/**
+ * Clear and re-open the store.
+ *
+ * This is rarely useful if you want to re-try opening the active store.  You usually won't need to invoke this manually.
+ */
+- (void)reloadStore;
+
 /**
  * This will delete all the data from iCloud for this application.
  *
@@ -250,6 +259,8 @@ typedef enum {
  * Any cloud content and cloud store changes on other devices that are not present on this device's cloud store will be lost.
  */
 - (void)rebuildCloudContentFromCloudStore;
+
+#pragma mark - Store Information
 
 /**
  * Determine whether it's safe to seed the cloud store with a local store.
