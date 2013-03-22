@@ -68,6 +68,7 @@
           <option name="ELSE_ON_NEW_LINE" value="true" />
           <option name="CATCH_ON_NEW_LINE" value="true" />
           <option name="FINALLY_ON_NEW_LINE" value="true" />
+          <option name="ALIGN_MULTILINE_BINARY_OPERATION" value="true" />
           <option name="ALIGN_MULTILINE_TERNARY_OPERATION" value="true" />
           <option name="ALIGN_MULTILINE_ARRAY_INITIALIZER_EXPRESSION" value="true" />
           <option name="SPACE_WITHIN_ARRAY_INITIALIZER_BRACES" value="true" />
@@ -75,7 +76,6 @@
           <option name="SPACE_BEFORE_QUEST" value="false" />
           <option name="SPACE_BEFORE_COLON" value="false" />
           <option name="METHOD_CALL_CHAIN_WRAP" value="1" />
-          <option name="BINARY_OPERATION_WRAP" value="1" />
           <option name="ARRAY_INITIALIZER_LBRACE_ON_NEXT_LINE" value="true" />
           <option name="ARRAY_INITIALIZER_RBRACE_ON_NEXT_LINE" value="true" />
           <option name="ASSIGNMENT_WRAP" value="1" />

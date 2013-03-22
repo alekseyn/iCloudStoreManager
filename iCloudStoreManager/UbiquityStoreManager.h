@@ -34,6 +34,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreData/CoreData.h>
 
+
 /**
  * The store managed by the ubiquity manager's coordinator changed (eg. switching (no store) or switched to iCloud or local).
  *
@@ -105,7 +106,8 @@ typedef enum {
  *                     NO if the local store was just loaded.
  */
 @required
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator isCloud:(BOOL)isCloudStore;
+- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager didLoadStoreForCoordinator:(NSPersistentStoreCoordinator *)coordinator
+                     isCloud:(BOOL)isCloudStore;
 
 /** Triggered when the store manager fails to loads a persistence store.
  *
@@ -195,13 +197,13 @@ typedef enum {
 @interface UbiquityStoreManager : NSObject
 
 /** The delegate provides the managed object context to use and is informed of events in the ubiquity manager. */
-@property (nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
+@property(nonatomic, weak) id<UbiquityStoreManagerDelegate> delegate;
 
 /** Determines what strategy to use when migrating from one store to another (eg. local -> cloud).  Default is UbiquityStoreMigrationStrategyCopyEntities. */
-@property (nonatomic, assign) UbiquityStoreMigrationStrategy migrationStrategy;
+@property(nonatomic, assign) UbiquityStoreMigrationStrategy migrationStrategy;
 
 /** Indicates whether the iCloud store or the local store is in use. */
-@property (nonatomic) BOOL cloudEnabled;
+@property(nonatomic) BOOL cloudEnabled;
 
 /** Start managing an optionally ubiquitous store coordinator.
  *  @param contentName The name of the local and cloud stores that this manager will create.  If nil, "UbiquityStore" will be used.
@@ -212,7 +214,8 @@ typedef enum {
  *  @param delegate The application controller that will be handling the application's persistence responsibilities.
  */
 - (id)initStoreNamed:(NSString *)contentName withManagedObjectModel:(NSManagedObjectModel *)model localStoreURL:(NSURL *)localStoreURL
- containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions delegate:(id<UbiquityStoreManagerDelegate>)delegate;
+ containerIdentifier:(NSString *)containerIdentifier additionalStoreOptions:(NSDictionary *)additionalStoreOptions
+            delegate:(id<UbiquityStoreManagerDelegate>)delegate;
 
 #pragma mark - Store Management
 
