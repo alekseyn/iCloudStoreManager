@@ -18,6 +18,7 @@
 
 @property(nonatomic, strong) UIAlertView *handleCloudContentWarningAlert;
 
+@property(nonatomic, strong) UIAlertView *handleLocalStoreAlert;
 - (NSURL *)storeURL;
 @end
 
@@ -40,22 +41,6 @@
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     NSLog(@"Starting iCloudStoreManagerExample on device: %@\n\n", [UIDevice currentDevice].name);
-
-    self.handleCloudContentAlert = [[UIAlertView alloc] initWithTitle:@"iCloud Sync Problem" message:
-            @"\n\n\n\nWaiting for another device to auto‑correct the problem..."
-                                                             delegate:self
-                                                    cancelButtonTitle:nil
-                                                    otherButtonTitles:@"Fix Now", nil];
-    UIActivityIndicatorView *activityIndicator = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
-    activityIndicator.center = CGPointMake(142, 90);
-    [activityIndicator startAnimating];
-    [self.handleCloudContentAlert addSubview:activityIndicator];
-    self.handleCloudContentWarningAlert = [[UIAlertView alloc] initWithTitle:@"Fix iCloud Now" message:
-            @"This problem can usually be auto‑corrected by opening the app on another device where you recently made changes.\n"
-                    @"If you wish to correct the problem from this device anyway, it is possible that recent changes on another device will be lost."
-                                                                    delegate:self
-                                                           cancelButtonTitle:@"Back"
-                                                           otherButtonTitles:@"Fix Anyway", nil];
 
     // STEP 1 - Initialize the UbiquityStoreManager
 	ubiquityStoreManager = [[UbiquityStoreManager alloc] initStoreNamed:nil withManagedObjectModel:[self managedObjectModel]
@@ -175,9 +160,16 @@
 
 - (void)alertView:(UIAlertView *)alertView clickedButtonAtIndex:(NSInteger)buttonIndex {
 
-    if (alertView == self.handleCloudContentAlert && buttonIndex == [alertView firstOtherButtonIndex])
-            // Fix Now
+    if (alertView == self.handleCloudContentAlert && buttonIndex == [alertView firstOtherButtonIndex]) {
+        // Fix Now
+        self.handleCloudContentWarningAlert = [[UIAlertView alloc] initWithTitle:@"Fix iCloud Now" message:
+                @"This problem can usually be auto‑corrected by opening the app on another device where you recently made changes.\n"
+                        @"If you wish to correct the problem from this device anyway, it is possible that recent changes on another device will be lost."
+                                                                        delegate:self
+                                                               cancelButtonTitle:@"Back"
+                                                               otherButtonTitles:@"Fix Anyway", nil];
         [self.handleCloudContentWarningAlert show];
+    }
 
     if (alertView == self.handleCloudContentWarningAlert) {
         if (buttonIndex == alertView.cancelButtonIndex)
@@ -186,8 +178,11 @@
 
         if (buttonIndex == alertView.firstOtherButtonIndex)
                 // Fix Anyway
-            [self.ubiquityStoreManager rebuildCloudContentFromCloudStore];
+            [self.ubiquityStoreManager rebuildCloudContentFromCloudStoreOrLocalStore:YES];
     }
+
+    if (alertView == self.handleLocalStoreAlert && buttonIndex == [alertView firstOtherButtonIndex])
+        [self.ubiquityStoreManager deleteLocalStore];
 }
 
 
@@ -211,6 +206,14 @@
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [masterViewController.storeLoadingActivity stopAnimating];
+        
+        if (!wasCloudStore && ![self.handleLocalStoreAlert isVisible]) {
+            self.handleLocalStoreAlert = [[UIAlertView alloc] initWithTitle:@"Local Store Problem" message:
+                    @"Your datastore got corrupted and needs to be recreated."
+                                                                   delegate:self
+                                                          cancelButtonTitle:nil otherButtonTitles:@"Recreate", nil];
+            [self.handleLocalStoreAlert show];
+        }
     });
 }
 
@@ -232,14 +235,25 @@
     });
 }
 
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionIsCloud:(BOOL)isCloudStore {
+- (BOOL)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionWithHealthyStore:(BOOL)storeHealthy {
 
     if ([self.handleCloudContentAlert isVisible] || [self.handleCloudContentWarningAlert isVisible])
         NSLog(@"already showing.");
-    else
+    else if (manager.cloudEnabled && !storeHealthy)
         dispatch_async(dispatch_get_main_queue(), ^{
+            self.handleCloudContentAlert = [[UIAlertView alloc] initWithTitle:@"iCloud Sync Problem" message:
+                    @"\n\n\n\nWaiting for another device to auto‑correct the problem..."
+                                                                     delegate:self
+                                                            cancelButtonTitle:nil otherButtonTitles:@"Fix Now", nil];
+            UIActivityIndicatorView *activityIndicator = [[UIActivityIndicatorView alloc]
+                    initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
+            activityIndicator.center = CGPointMake( 142, 90 );
+            [activityIndicator startAnimating];
+            [self.handleCloudContentAlert addSubview:activityIndicator];
             [self.handleCloudContentAlert show];
         });
+
+    return NO;
 }
 
 @end

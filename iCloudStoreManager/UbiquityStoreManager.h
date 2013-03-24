@@ -111,9 +111,11 @@ typedef enum {
 
 /** Triggered when the store manager fails to loads a persistence store.
  *
- * The manager is done handling the attempt to load the store.  The store will be unavailable unless another attempt is made to load the store.
+ * The manager is done handling the attempt to load the store.  The store will be unavailable unless you intervene.
  *
- * -ubiquityStoreManager:handleCloudContentCorruptionIsCloud: may get called later if the store that failed to load was the cloud store.
+ * If wasCloudStore is YES, -ubiquityStoreManager:handleCloudContentCorruptionIsCloud: will also be been called.  You should handle the
+ * failure there, or here if you don't plan to.
+ * If wasCloudStore is NO, the local store may be irreparably broken.  You should probably -deleteLocalStore to fix the persistence layer.
  *
  * @param wasCloudStore YES if the error was caused while attempting to load the cloud store.
  *                      NO if the error was caused while attempting to load the local store.
@@ -124,45 +126,68 @@ typedef enum {
 
 /** Triggered when the store manager has detected that the cloud content has failed to import on one of the devices.
  *
- * The result is that the cloud store on this device is no longer guaranteed to be the same as the cloud store on
- * other devices.  Moreover, there is no more guarantee that changes made to the cloud store will sync to other devices.
- * iCloud sync for the cloud store is therefore effectively broken.
+ * TL;DR: The recommended way to implement this method is to return NO (so the default solution will be effected).
+ * If storeHealthy is YES, you can show the user that iCloud is being fixed.
+ * If storeHealthy is NO, you should tell the user this device is waiting and he should open the app on his other device(s) so they can
+ * attempt to fix the situation.
  *
- * When this happens, there is only one recovery: The cloud store must be recreated.
+ * Why did this happen?
  *
- * The most likely cause of this is an Apple bug with regards to synchronizing Core Data relationships using
- * transaction logs.  When two devices simultaneously modify a relationship, the resulting transaction logs can cause
- * an irreparable conflict.
+ * When cloud content (transaction logs) fail to import into the cloud store on this device, the result is that the cloud store is no
+ * longer guaranteed to be the same as the cloud store on other devices.  Moreover, there is no more guarantee that changes made to the
+ * cloud store will sync to other devices.  iCloud sync for the cloud store is therefore effectively broken.
  *
- * The manager protects the user from committing more data into the corrupt cloud content container.
- * If you implement this method, it will be invoked on every device that attempts to use the cloud store until
- * the cloud store is rebuilt.  After invoking this method, if the cloud store is currently enabled, it will be
- * unloaded and the store coordinator will have no store available.
- * If you don't implement this method, the manager will switch to the local store and the cloud store will remain
- * unavailable.
+ * When this happens, there is only one recovery: The cloud store must be recreated from scratch.
  *
- * When you receive this method, there are a few things you can do to handle the situation:
+ * Unfortunately, this situation tends to occur very easily because of an Apple bug with regards to synchronizing Core Data relationships:
+ * When two devices simultaneously modify a relationship, the resulting transaction logs can cause an irreparable conflict.
+ *
+ * You can implement this method to be notified of when this situation occurs.  If you plan to handle the problem yourself and deal with
+ * the corruption, return YES to disable the manager's default strategy.
+ * If you want the manager to effect its default solution, return NO (or don't implement this method).
+ *
+ * The default solution to this problem is to unload the cloud store on all devices where transaction logs can no longer be imported into
+ * the store.  A device that has not noticed any import problems will be notified of cloud corruption in other devices and initiate a
+ * rebuild of the cloud content.
+ *
+ * If you want to handle the corruption yourself, you have a few options.  Keep in mind: To fix the situation you will need to create
+ * a new cloud store; only a new cloud store can guarantee that all devices are back in-sync.  Here's what you could do:
  * - Switch to the local store (manager.cloudEnabled = NO).
  *      NOTE: The cloud data and cloud syncing will be unavailable.
  * - Delete the cloud data and recreate it by seeding it with the local store ([manager deleteCloudStoreLocalOnly:NO]).
  *      NOTE: The existing cloud data will be lost.
  * - Make the existing cloud data local and disable iCloud ([manager migrateCloudToLocalAndDeleteCloudStoreLocalOnly:NO]).
  *      NOTE: The existing local store will be lost.
- *      NOTE: You should set localOnly to NO so that the corruption is cleared and enabling iCloud in the future
-  *           will seed it with the new local store.
- * - Rebuild the cloud content by seeding it with the cloud store of this device ([manager rebuildCloudContentFromCloudStore]).
+ *      NOTE: The cloud data known by this device will become available again.
+ *      NOTE: If you set localOnly to NO, the user can re-enable iCloud but any cloud data not synced to this device will be lost.
+ * - Rebuild the cloud content by seeding it with the cloud store of this device ([manager rebuildCloudContentFromCloudStoreOrLocalStore:YES]).
+ *      NOTE: iCloud functionality will be completely restored with the cloud data known by this device.
  *      NOTE: Any cloud changes on other devices that failed to sync to this device will be lost.
+ *      NOTE: If you specify YES for allowRebuildFromLocalStore and the cloud store on this device is unusable for repairing the cloud
+  *           content, a new cloud store will be created from the local store instead.
  *
- * The recommended way to handle this method is to pop an alert to the user, tell him what happened, and give him
- * a choice on how to proceed.  The alert will pop up on each of his devices.  If he wants to rebuild the cloud store,
- * this will enable him to choose what device to press the rebuild button on.
- * Don't forget to dismiss the alert when you get -ubiquityStoreManager:didLoadStoreForCoordinator:isCloud:YES.
+ * Keep in mind that if storeHealthy is YES, the cloud store will, if enabled, still be loaded.  If storeHealthy is NO, the cloud store
+ * will, if enabled, have been unloaded before this method is called and no store will be available at this point.
  *
- * @param isCloudStore YES if the cloud store is currently loaded.
- *                     NO if the local store is currently loaded.
-*/
+ * @param storeHealthy YES if this device has no loading or syncing problems with the cloud store.
+ *                     NO if this device can no longer open or sync with the cloud store.
+ * @return YES if you've handled the corruption yourself and want to disable the manager's default strategy for resolving corruption.
+ *         NO if you just use this method to inform the user or your application and want the manager to handle the problem for you.
+ */
 @optional
-- (void)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionIsCloud:(BOOL)isCloudStore;
+- (BOOL)ubiquityStoreManager:(UbiquityStoreManager *)manager handleCloudContentCorruptionWithHealthyStore:(BOOL)storeHealthy;
+
+/** Triggered when the cloud content is deleted.
+ *
+ * When the cloud store is deleted, it may be that the user has deleted his cloud data for the app from one of his devices.
+ * It is therefore not necessarily desirable to immediately re-create a cloud store.  By default, the manager will just unload the store,
+ * leaving you with no persistence.
+ *
+ * It may be desirable to show UI to the user allowing him to choose between re-enabling iCloud ([manager deleteCloudStoreLocalOnly:NO])
+ * or disabling it and switching back to local data (manager.cloudEnabled = NO).
+ */
+@optional
+- (void)ubiquityStoreManagerHandleCloudContentDeletion:(UbiquityStoreManager *)manager;
 
 /** Triggered when the store manager encounters an error.  Mainly useful to handle error conditions/logging in whatever way you see fit.
  *
@@ -260,8 +285,11 @@ typedef enum {
 /**
  * This will delete the cloud content and recreate a new cloud store by seeding it with the current cloud store.
  * Any cloud content and cloud store changes on other devices that are not present on this device's cloud store will be lost.
+ *
+ * @param allowRebuildFromLocalStore If YES and the cloud content cannot be rebuilt from the cloud store, the local store will be used
+  * instead.  Beware: All former cloud content will be lost.
  */
-- (void)rebuildCloudContentFromCloudStore;
+- (void)rebuildCloudContentFromCloudStoreOrLocalStore:(BOOL)allowRebuildFromLocalStore;
 
 #pragma mark - Store Information
 
