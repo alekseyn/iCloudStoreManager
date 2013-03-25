@@ -99,15 +99,15 @@ NSString *const CloudContentDirectory = @"CloudLogs";
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:)
                                                  name:UIApplicationDidBecomeActiveNotification
                                                object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:)
-                                                 name:UIApplicationWillEnterForegroundNotification
-                                               object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterBackground:)
-                                                 name:UIApplicationDidEnterBackgroundNotification
-                                               object:nil];
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillTerminate:)
-                                                 name:UIApplicationWillTerminateNotification
-                                               object:nil];
+//    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillEnterForeground:)
+//                                                 name:UIApplicationWillEnterForegroundNotification
+//                                               object:nil];
+//    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidEnterBackground:)
+//                                                 name:UIApplicationDidEnterBackgroundNotification
+//                                               object:nil];
+//    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationWillTerminate:)
+//                                                 name:UIApplicationWillTerminateNotification
+//                                               object:nil];
 #else
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(applicationDidBecomeActive:)
                                                  name:NSApplicationDidBecomeActiveNotification
@@ -1011,8 +1011,6 @@ NSString *const CloudContentDirectory = @"CloudLogs";
     if (self.tentativeStoreUUID) {
         [self log:@"Confirming tentative StoreUUID: %@", self.tentativeStoreUUID];
         NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-        NSLog( @"StoreUUID: %@ -> %@", [cloud objectForKey:StoreUUIDKey], self.tentativeStoreUUID );
-        NSLog( @"StoreContentCorruptedKey removed" );
         [cloud setObject:self.tentativeStoreUUID forKey:StoreUUIDKey];
         [cloud removeObjectForKey:StoreContentCorruptedKey];
         [cloud synchronize];
@@ -1092,32 +1090,31 @@ NSString *const CloudContentDirectory = @"CloudLogs";
         [self cloudStoreChanged:nil];
 }
 
-- (void)applicationWillEnterForeground:(NSNotification *)note {
-
-    [self reloadStore];
-}
-
-- (void)applicationDidEnterBackground:(NSNotification *)note {
-
-    [self.persistentStorageQueue addOperations:@[
-            [NSBlockOperation blockOperationWithBlock:^{
-                [self clearStore];
-            }]
-    ]                        waitUntilFinished:YES];
-}
-
-- (void)applicationWillTerminate:(NSNotification *)note {
-
-    [self.persistentStorageQueue addOperations:@[
-            [NSBlockOperation blockOperationWithBlock:^{
-                [self clearStore];
-            }]
-    ]                        waitUntilFinished:YES];
-}
+//- (void)applicationWillEnterForeground:(NSNotification *)note {
+//
+//    [self reloadStore];
+//}
+//
+//- (void)applicationDidEnterBackground:(NSNotification *)note {
+//
+//    [self.persistentStorageQueue addOperations:@[
+//            [NSBlockOperation blockOperationWithBlock:^{
+//                [self clearStore];
+//            }]
+//    ]                        waitUntilFinished:YES];
+//}
+//
+//- (void)applicationWillTerminate:(NSNotification *)note {
+//
+//    [self.persistentStorageQueue addOperations:@[
+//            [NSBlockOperation blockOperationWithBlock:^{
+//                [self clearStore];
+//            }]
+//    ]                        waitUntilFinished:YES];
+//}
 
 - (void)keyValueStoreChanged:(NSNotification *)note {
 
-    NSLog( @"KVS update: %@", note );
     NSUbiquitousKeyValueStore * cloud = [NSUbiquitousKeyValueStore defaultStore];
     [cloud synchronize];
 
@@ -1163,7 +1160,6 @@ NSString *const CloudContentDirectory = @"CloudLogs";
     self.cloudStoreCorruptUUID = self.storeUUID;
 
     NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
-    NSLog( @"StoreContentCorruptedKey: %@ -> %@", [cloud objectForKey:StoreContentCorruptedKey], @YES );
     [cloud setBool:YES forKey:StoreContentCorruptedKey];
     [cloud synchronize];
 
@@ -1184,7 +1180,6 @@ NSString *const CloudContentDirectory = @"CloudLogs";
     NSUbiquitousKeyValueStore *cloud = [NSUbiquitousKeyValueStore defaultStore];
     [cloud synchronize];
 
-    NSLog( @"StoreContentCorruptedKey: %@", [[cloud objectForKey:StoreContentCorruptedKey] debugDescription] );
     if (![cloud boolForKey:StoreContentCorruptedKey])
         // Cloud content is not corrupt.
         return NO;
