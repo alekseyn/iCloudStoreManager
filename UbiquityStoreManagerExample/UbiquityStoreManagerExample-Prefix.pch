@@ -1,5 +1,5 @@
 //
-// Prefix header for all source files of the 'iCloudStoreManagerExample' target in the 'iCloudStoreManagerExample' project
+// Prefix header for all source files of the 'UbiquityStoreManagerExample' target in the 'UbiquityStoreManagerExample' project
 //
 
 #import <Availability.h>

@@ -1,6 +1,6 @@
 //
 //  AppDelegate.m
-//  iCloudStoreManagerExample
+//  UbiquityStoreManagerExample
 //
 //  Created by Aleksey Novicov on 3/27/12.
 //  Copyright (c) 2012 Yodel Code LLC. All rights reserved.
@@ -40,7 +40,7 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
-    NSLog(@"Starting iCloudStoreManagerExample on device: %@\n\n", [UIDevice currentDevice].name);
+    NSLog(@"Starting UbiquityStoreManagerExample on device: %@\n\n", [UIDevice currentDevice].name);
 
     // STEP 1 - Initialize the UbiquityStoreManager
 	ubiquityStoreManager = [[UbiquityStoreManager alloc] initStoreNamed:nil withManagedObjectModel:[self managedObjectModel]
@@ -125,7 +125,7 @@
     if (__managedObjectModel != nil) {
         return __managedObjectModel;
     }
-    NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"iCloudStoreManagerExample" withExtension:@"momd"];
+    NSURL *modelURL = [[NSBundle mainBundle] URLForResource:@"UbiquityStoreManagerExample" withExtension:@"momd"];
     __managedObjectModel = [[NSManagedObjectModel alloc] initWithContentsOfURL:modelURL];
     return __managedObjectModel;
 }
