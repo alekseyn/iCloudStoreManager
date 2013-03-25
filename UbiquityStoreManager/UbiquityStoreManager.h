@@ -111,9 +111,7 @@ typedef enum {
 
 /** Triggered when the store manager fails to loads a persistence store.
  *
- * The manager is done handling the attempt to load the store.  The store will be unavailable unless you intervene.
- *
- * If wasCloudStore is YES, -ubiquityStoreManager:handleCloudContentCorruptionIsCloud: will also be been called.  You should handle the
+ * If wasCloudStore is YES, -ubiquityStoreManager:handleCloudContentCorruptionIsCloud: will also be called.  You should handle the
  * failure there, or here if you don't plan to.
  * If wasCloudStore is NO, the local store may be irreparably broken.  You should probably -deleteLocalStore to fix the persistence layer.
  *

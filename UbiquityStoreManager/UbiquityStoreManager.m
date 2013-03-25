@@ -1,9 +1,18 @@
+/**
+ * Copyright Maarten Billemont (http://www.lhunath.com, lhunath@lyndir.com)
+ *
+ * See the enclosed file LICENSE for license information (LGPLv3). If you did
+ * not receive this file, see http://www.gnu.org/licenses/lgpl-3.0.txt
+ *
+ * @author   Maarten Billemont <lhunath@lyndir.com>
+ * @license  http://www.gnu.org/licenses/lgpl-3.0.txt
+ */
+
 //
 //  UbiquityStoreManager.m
 //  UbiquityStoreManager
 //
-//  Created by Aleksey Novicov on 3/27/12.
-//  Copyright (c) 2012 Yodel Code LLC. All rights reserved.
+//  Created by Maarten Billemont on 05/11/09.
 //
 
 #import "UbiquityStoreManager.h"
